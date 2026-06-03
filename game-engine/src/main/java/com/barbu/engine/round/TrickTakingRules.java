@@ -1,0 +1,98 @@
+package com.barbu.engine.round;
+
+import com.barbu.engine.card.Card;
+import com.barbu.engine.card.Suit;
+import com.barbu.engine.model.Contract;
+import com.barbu.engine.model.Move;
+import com.barbu.engine.model.ScoringConfig;
+import com.barbu.engine.model.Seats;
+
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+public final class TrickTakingRules {
+    private TrickTakingRules() {
+    }
+
+    public static List<Move> legalMoves(TrickTakingState state, int seat) {
+        if (seat != state.currentPlayer()) {
+            return List.of();
+        }
+        List<Card> hand = state.hands().get(seat);
+        Suit led = state.currentTrick().ledSuit();
+        List<Card> playable = new ArrayList<>();
+        if (led != null) {
+            for (Card c : hand) {
+                if (c.suit() == led) {
+                    playable.add(c);
+                }
+            }
+        }
+        if (playable.isEmpty()) {
+            playable = hand;
+        }
+        List<Move> moves = new ArrayList<>(playable.size());
+        for (Card c : playable) {
+            moves.add(new Move.PlayCard(c));
+        }
+        return List.copyOf(moves);
+    }
+
+    public static RoundState applyMove(TrickTakingState state, int seat, Move move) {
+        if (seat != state.currentPlayer()) {
+            throw new IllegalArgumentException("not seat " + seat + "'s turn");
+        }
+        if (!(move instanceof Move.PlayCard play)) {
+            throw new IllegalArgumentException("trick-taking accepts only PlayCard");
+        }
+        if (legalMoves(state, seat).stream().noneMatch(m -> m.equals(move))) {
+            throw new IllegalArgumentException("illegal move: " + play.card());
+        }
+
+        List<List<Card>> hands = mutableCopy(state.hands());
+        hands.get(seat).remove(play.card());
+
+        Trick trick = state.currentTrick().withCard(play.card());
+        List<List<Card>> captured = mutableCopy(state.captured());
+
+        if (trick.isComplete()) {
+            int winner = trick.winner();
+            captured.get(winner).addAll(trick.cards());
+            return new TrickTakingState(state.contract(), hands,
+                    Trick.startedBy(winner, state.playerCount()), captured, winner);
+        }
+        return new TrickTakingState(state.contract(), hands, trick, captured,
+                Seats.next(seat, state.playerCount()));
+    }
+
+    public static Map<Integer, Integer> score(TrickTakingState state) {
+        if (!state.isComplete()) {
+            throw new IllegalStateException("round not complete");
+        }
+        Map<Integer, Integer> result = new LinkedHashMap<>();
+        for (int seat = 0; seat < state.playerCount(); seat++) {
+            result.put(seat, scoreSeat(state.contract(), state.captured().get(seat), state.playerCount()));
+        }
+        return result;
+    }
+
+    private static int scoreSeat(Contract contract, List<Card> captured, int playerCount) {
+        return switch (contract) {
+            case NO_TRICKS -> (captured.size() / playerCount) * ScoringConfig.PER_TRICK;
+            case NO_HEARTS -> (int) captured.stream().filter(Card::isHeart).count() * ScoringConfig.PER_HEART;
+            case NO_QUEENS -> (int) captured.stream().filter(Card::isQueen).count() * ScoringConfig.PER_QUEEN;
+            case NO_RED_KINGS -> (int) captured.stream().filter(Card::isRedKing).count() * ScoringConfig.PER_RED_KING;
+            case MONTANTE -> throw new IllegalArgumentException("montante is not a trick-taking contract");
+        };
+    }
+
+    private static List<List<Card>> mutableCopy(List<List<Card>> in) {
+        List<List<Card>> out = new ArrayList<>(in.size());
+        for (List<Card> hand : in) {
+            out.add(new ArrayList<>(hand));
+        }
+        return out;
+    }
+}
