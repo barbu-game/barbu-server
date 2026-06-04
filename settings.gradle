@@ -1,3 +1,4 @@
 rootProject.name = 'barbu-server'
 include 'game-engine'
 include 'bot'
+include 'app'

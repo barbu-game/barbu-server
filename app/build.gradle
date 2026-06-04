@@ -1,0 +1,45 @@
+plugins {
+    id 'io.micronaut.application' version '4.4.4'
+}
+
+version = '0.1'
+group = 'com.barbu'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation project(':game-engine')
+    implementation project(':bot')
+    implementation 'io.micronaut:micronaut-http-server-netty'
+    implementation 'io.micronaut:micronaut-websocket'
+    implementation 'io.micronaut:micronaut-jackson-databind'
+    runtimeOnly 'ch.qos.logback:logback-classic'
+    runtimeOnly 'org.yaml:snakeyaml'
+
+    testImplementation 'io.micronaut:micronaut-http-client'
+    testImplementation 'io.micronaut.test:micronaut-test-junit5'
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+application {
+    mainClass = 'com.barbu.app.Application'
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+micronaut {
+    version '4.6.3'
+    runtime 'netty'
+    testRuntime 'junit5'
+    processing {
+        incremental true
+        annotations 'com.barbu.*'
+    }
+}

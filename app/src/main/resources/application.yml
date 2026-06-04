@@ -1,0 +1,11 @@
+micronaut:
+  application:
+    name: barbu
+  server:
+    port: 8080
+    cors:
+      enabled: true
+      configurations:
+        web:
+          allowed-origins:
+            - http://localhost:3000
