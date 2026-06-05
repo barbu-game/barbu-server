@@ -11,6 +11,8 @@ repositories {
 
 dependencies {
     annotationProcessor 'io.micronaut.data:micronaut-data-processor'
+    annotationProcessor 'io.micronaut.openapi:micronaut-openapi'
+    implementation 'io.swagger.core.v3:swagger-annotations:2.2.22'
 
     implementation project(':game-engine')
     implementation project(':bot')

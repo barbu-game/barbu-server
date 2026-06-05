@@ -1,0 +1,49 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+
+      - name: Build and test
+        run: ./gradlew test --no-daemon
+
+      - name: Compute version
+        id: version
+        uses: paulhatch/semantic-version@v5.4.0
+        with:
+          tag_prefix: v
+          version_format: "${major}.${minor}.${patch}"
+
+      - name: Generate OpenAPI spec
+        run: ./gradlew :app:compileJava --no-daemon
+
+      - name: Locate spec
+        id: spec
+        run: echo "path=$(find app/build -name 'barbu-api-*.yml' | head -1)" >> "$GITHUB_OUTPUT"
+
+      - name: Tag release with the spec as an asset
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          files: ${{ steps.spec.outputs.path }}
+
+      # Downstream (mirrors getout): a reusable workflow runs Orval on this spec and
+      # publishes @barbu/barbu-api to GitHub Packages (npm.pkg.github.com). barbu-web
+      # pins that version, so any contract drift breaks barbu-web's typecheck.
