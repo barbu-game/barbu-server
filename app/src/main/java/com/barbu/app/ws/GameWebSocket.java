@@ -2,6 +2,7 @@ package com.barbu.app.ws;
 
 import com.barbu.app.protocol.Codec;
 import com.barbu.app.room.GameRoom;
+import com.barbu.app.room.InMemoryMatchmaker;
 import com.barbu.app.room.RoomManager;
 import com.barbu.engine.model.Contract;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -20,10 +21,12 @@ import java.util.Map;
 public class GameWebSocket {
 
     private final RoomManager rooms;
+    private final InMemoryMatchmaker matchmaker;
     private final ObjectMapper mapper;
 
-    public GameWebSocket(RoomManager rooms, ObjectMapper mapper) {
+    public GameWebSocket(RoomManager rooms, InMemoryMatchmaker matchmaker, ObjectMapper mapper) {
         this.rooms = rooms;
+        this.matchmaker = matchmaker;
         this.mapper = mapper;
     }
 
@@ -67,6 +70,9 @@ public class GameWebSocket {
                 sendJoined(session, room.id(), seat);
                 room.broadcast();
             }
+            case "enqueueMatchmaking" -> matchmaker.enqueue(
+                    session, asString(command.get("name")), asInt(command.get("size"), 4));
+            case "cancelMatchmaking" -> matchmaker.cancel(session);
             case "addBot" -> withRoom(session, room -> {
                 room.addBot();
                 room.broadcast();
@@ -86,6 +92,7 @@ public class GameWebSocket {
 
     @OnClose
     public void onClose(WebSocketSession session) {
+        matchmaker.cancel(session);
         String roomId = session.get("roomId", String.class).orElse(null);
         Integer seat = session.get("seat", Integer.class).orElse(null);
         if (roomId == null || seat == null) {
