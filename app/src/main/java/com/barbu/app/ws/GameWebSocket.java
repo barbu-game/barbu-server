@@ -5,6 +5,8 @@ import com.barbu.app.room.GameRoom;
 import com.barbu.app.room.RoomManager;
 import com.barbu.engine.model.Contract;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micronaut.security.annotation.Secured;
+import io.micronaut.security.rules.SecurityRule;
 import io.micronaut.websocket.WebSocketSession;
 import io.micronaut.websocket.annotation.OnClose;
 import io.micronaut.websocket.annotation.OnMessage;
@@ -14,6 +16,7 @@ import io.micronaut.websocket.annotation.ServerWebSocket;
 import java.util.Map;
 
 @ServerWebSocket("/ws/game")
+@Secured(SecurityRule.IS_ANONYMOUS)
 public class GameWebSocket {
 
     private final RoomManager rooms;

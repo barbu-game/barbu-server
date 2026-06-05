@@ -1,5 +1,6 @@
 package com.barbu.app.room;
 
+import com.barbu.app.persistence.MatchRecorder;
 import com.barbu.app.protocol.Codec;
 import com.barbu.bot.BotStrategy;
 import com.barbu.bot.HeuristicBot;
@@ -34,6 +35,7 @@ public final class GameRoom {
     private final ObjectMapper mapper;
     private final ScheduledExecutorService scheduler;
     private final long botDelayMs;
+    private final MatchRecorder recorder;
     private final BotStrategy bot = new HeuristicBot();
 
     private final String[] names;
@@ -41,13 +43,16 @@ public final class GameRoom {
     private final WebSocketSession[] sessions;
 
     private MatchState match;
+    private boolean recorded;
 
-    GameRoom(String id, int playerCount, ObjectMapper mapper, ScheduledExecutorService scheduler, long botDelayMs) {
+    GameRoom(String id, int playerCount, ObjectMapper mapper, ScheduledExecutorService scheduler,
+             long botDelayMs, MatchRecorder recorder) {
         this.id = id;
         this.playerCount = playerCount;
         this.mapper = mapper;
         this.scheduler = scheduler;
         this.botDelayMs = botDelayMs;
+        this.recorder = recorder;
         this.names = new String[playerCount];
         this.isBot = new boolean[playerCount];
         this.sessions = new WebSocketSession[playerCount];
@@ -188,6 +193,23 @@ public final class GameRoom {
             } catch (Exception ignored) {
                 // a dropped client is reconciled on its next connect via a fresh snapshot
             }
+        }
+        maybeRecord();
+    }
+
+    private void maybeRecord() {
+        if (recorder == null || recorded || match == null || !MatchEngine.isComplete(match)) {
+            return;
+        }
+        recorded = true;
+        List<MatchRecorder.PlayerInfo> players = new ArrayList<>(playerCount);
+        for (int seat = 0; seat < playerCount; seat++) {
+            players.add(new MatchRecorder.PlayerInfo(seat, names[seat], isBot[seat], null));
+        }
+        try {
+            recorder.record("private", match, players);
+        } catch (Exception ignored) {
+            // persistence is best-effort; a failure must not interrupt play
         }
     }
 

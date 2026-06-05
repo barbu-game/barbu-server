@@ -1,5 +1,6 @@
 package com.barbu.app.room;
 
+import com.barbu.app.persistence.MatchRecorder;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PreDestroy;
 import jakarta.inject.Singleton;
@@ -17,11 +18,13 @@ public class RoomManager {
 
     private final Map<String, GameRoom> rooms = new ConcurrentHashMap<>();
     private final ObjectMapper mapper;
+    private final MatchRecorder recorder;
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
     private final Random random = new Random();
 
-    public RoomManager(ObjectMapper mapper) {
+    public RoomManager(ObjectMapper mapper, MatchRecorder recorder) {
         this.mapper = mapper;
+        this.recorder = recorder;
     }
 
     private static final long BOT_DELAY_MS = 650;
@@ -29,7 +32,7 @@ public class RoomManager {
     public GameRoom create(int requestedPlayerCount) {
         int playerCount = Math.max(2, Math.min(10, requestedPlayerCount));
         String id = newCode();
-        GameRoom room = new GameRoom(id, playerCount, mapper, scheduler, BOT_DELAY_MS);
+        GameRoom room = new GameRoom(id, playerCount, mapper, scheduler, BOT_DELAY_MS, recorder);
         rooms.put(id, room);
         return room;
     }
