@@ -13,6 +13,7 @@ import com.barbu.engine.round.MontanteState;
 import com.barbu.engine.round.RoundEngine;
 import com.barbu.engine.round.RoundState;
 import com.barbu.engine.round.Trick;
+import com.barbu.engine.round.TrickTakingRules;
 import com.barbu.engine.round.TrickTakingState;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micronaut.websocket.WebSocketSession;
@@ -119,7 +120,7 @@ public final class GameRoom {
                 || seat != match.round().currentPlayer() || isBot[seat]) {
             return;
         }
-        match = MatchEngine.applyMove(match, seat, move);
+        match = MatchEngine.applyMoveNoSettle(match, seat, move);
         afterAdvance();
     }
 
@@ -172,11 +173,45 @@ public final class GameRoom {
 
     private void afterAdvance() {
         broadcast();
+        if (roundJustCompleted()) {
+            // Let everyone see the final trick (who took it) before scoring the round.
+            scheduler.schedule(this::settleStep, roundEndPauseMs(), TimeUnit.MILLISECONDS);
+        } else if (isVotableBoundary()) {
+            openVote();
+        } else {
+            scheduleBotsIfNeeded();
+        }
+    }
+
+    private synchronized void settleStep() {
+        if (!roundJustCompleted()) {
+            return;
+        }
+        match = MatchEngine.settle(match);
+        broadcast();
         if (isVotableBoundary()) {
             openVote();
         } else {
             scheduleBotsIfNeeded();
         }
+    }
+
+    private boolean roundJustCompleted() {
+        return match != null && match.round() != null && match.round().isComplete();
+    }
+
+    /** A trick is finished but still displayed; the winner has not led the next one yet. */
+    private boolean trickPending() {
+        return match != null && match.round() instanceof TrickTakingState t
+                && t.currentTrick().isComplete() && !t.isComplete();
+    }
+
+    private long trickPauseMs() {
+        return botDelayMs == 0 ? 0 : 1400;
+    }
+
+    private long roundEndPauseMs() {
+        return botDelayMs == 0 ? 0 : 2200;
     }
 
     private boolean isVotableBoundary() {
@@ -244,7 +279,8 @@ public final class GameRoom {
 
     private void scheduleBotsIfNeeded() {
         if (currentActorIsBot()) {
-            scheduler.schedule(this::botStep, botDelayMs, TimeUnit.MILLISECONDS);
+            long delay = trickPending() ? trickPauseMs() : botDelayMs;
+            scheduler.schedule(this::botStep, delay, TimeUnit.MILLISECONDS);
         }
     }
 
@@ -256,7 +292,7 @@ public final class GameRoom {
             match = MatchEngine.chooseContract(match, bot.chooseContract(match));
         } else {
             int seat = match.round().currentPlayer();
-            match = MatchEngine.applyMove(match, seat, bot.chooseMove(match.round(), seat));
+            match = MatchEngine.applyMoveNoSettle(match, seat, bot.chooseMove(match.round(), seat));
         }
         afterAdvance();
     }
@@ -358,6 +394,12 @@ public final class GameRoom {
 
         if (round instanceof TrickTakingState t) {
             view.put("trick", trickView(t.currentTrick()));
+            Map<Integer, Integer> running = TrickTakingRules.runningScores(t);
+            List<Integer> roundScores = new ArrayList<>();
+            for (int s = 0; s < playerCount; s++) {
+                roundScores.add(running.get(s));
+            }
+            view.put("roundScores", roundScores);
         } else if (round instanceof MontanteState m) {
             view.put("board", Codec.boardToMap(m.board()));
         }
@@ -431,6 +473,10 @@ public final class GameRoom {
         Map<String, Object> view = new LinkedHashMap<>();
         view.put("leader", trick.leader());
         view.put("plays", plays);
+        if (trick.isComplete()) {
+            view.put("complete", true);
+            view.put("winner", trick.winner());
+        }
         return view;
     }
 

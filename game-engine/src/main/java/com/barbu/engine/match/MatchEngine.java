@@ -71,6 +71,24 @@ public final class MatchEngine {
         return settleRound(m, round);
     }
 
+    /** Apply a move without settling a finished round, so callers can pause first. */
+    public static MatchState applyMoveNoSettle(MatchState m, int seat, Move move) {
+        if (m.round() == null) {
+            throw new IllegalStateException("no round in progress");
+        }
+        RoundState round = RoundEngine.applyMove(m.round(), seat, move);
+        return new MatchState(m.playerCount(), m.seed(), m.dealer(), m.roundNumber(),
+                m.plannedRounds(), m.playedByDealer(), round, m.totals(), m.history());
+    }
+
+    /** Score and close the current round if it is complete; otherwise a no-op. */
+    public static MatchState settle(MatchState m) {
+        if (m.round() == null || !m.round().isComplete()) {
+            return m;
+        }
+        return settleRound(m, m.round());
+    }
+
     public static MatchState playOut(MatchState m) {
         MatchState cur = m;
         while (cur.round() != null) {

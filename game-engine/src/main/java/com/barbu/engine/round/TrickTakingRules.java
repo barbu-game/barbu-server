@@ -21,7 +21,9 @@ public final class TrickTakingRules {
             return List.of();
         }
         List<Card> hand = state.hands().get(seat);
-        Suit led = state.currentTrick().ledSuit();
+        Trick trick = state.currentTrick();
+        // A completed trick is kept on the table for display; the winner now leads a new one.
+        Suit led = trick.isComplete() ? null : trick.ledSuit();
         List<Card> playable = new ArrayList<>();
         if (led != null) {
             for (Card c : hand) {
@@ -54,14 +56,19 @@ public final class TrickTakingRules {
         List<List<Card>> hands = mutableCopy(state.hands());
         hands.get(seat).remove(play.card());
 
-        Trick trick = state.currentTrick().withCard(play.card());
+        // The winner leads the next trick: collect the displayed trick before adding the card.
+        Trick current = state.currentTrick();
+        if (current.isComplete()) {
+            current = Trick.startedBy(seat, state.playerCount());
+        }
+        Trick trick = current.withCard(play.card());
         List<List<Card>> captured = mutableCopy(state.captured());
 
         if (trick.isComplete()) {
             int winner = trick.winner();
             captured.get(winner).addAll(trick.cards());
-            return new TrickTakingState(state.contract(), hands,
-                    Trick.startedBy(winner, state.playerCount()), captured, winner);
+            // Keep the completed trick on the table; the winner is the next to act.
+            return new TrickTakingState(state.contract(), hands, trick, captured, winner);
         }
         return new TrickTakingState(state.contract(), hands, trick, captured,
                 Seats.next(seat, state.playerCount()));
@@ -71,6 +78,11 @@ public final class TrickTakingRules {
         if (!state.isComplete()) {
             throw new IllegalStateException("round not complete");
         }
+        return runningScores(state);
+    }
+
+    /** Per-seat penalty for what has been captured so far (valid mid-round). */
+    public static Map<Integer, Integer> runningScores(TrickTakingState state) {
         Map<Integer, Integer> result = new LinkedHashMap<>();
         for (int seat = 0; seat < state.playerCount(); seat++) {
             result.put(seat, scoreSeat(state.contract(), state.captured().get(seat), state.playerCount()));
