@@ -86,6 +86,8 @@ public class GameWebSocket {
                     room.chooseContract(seat, Contract.valueOf(asString(command.get("contract")))));
             case "play" -> withRoomSeat(session, (room, seat) ->
                     room.play(seat, Codec.parseMove((Map<String, Object>) command.get("move"))));
+            case "castStopVote" -> withRoomSeat(session, (room, seat) ->
+                    room.castStopVote(seat, Boolean.TRUE.equals(command.get("stop"))));
             default -> sendError(session, "unknown command: " + type);
         }
     }

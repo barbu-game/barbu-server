@@ -22,6 +22,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -38,12 +39,18 @@ public final class GameRoom {
     private final MatchRecorder recorder;
     private final BotStrategy bot = new HeuristicBot();
 
+    private static final long VOTE_TIMEOUT_MS = 15000;
+
     private final String[] names;
     private final boolean[] isBot;
     private final WebSocketSession[] sessions;
 
     private MatchState match;
     private boolean recorded;
+    private boolean stopped;
+    private boolean voteOpen;
+    private Boolean[] votes;
+    private ScheduledFuture<?> voteTimeout;
 
     GameRoom(String id, int playerCount, ObjectMapper mapper, ScheduledExecutorService scheduler,
              long botDelayMs, MatchRecorder recorder) {
@@ -97,21 +104,37 @@ public final class GameRoom {
     }
 
     public synchronized void chooseContract(int seat, Contract contract) {
-        if (match == null || match.round() != null || seat != match.dealer() || isBot[seat]) {
+        if (voteOpen || match == null || match.round() != null || seat != match.dealer() || isBot[seat]) {
             return;
         }
         match = MatchEngine.chooseContract(match, contract);
-        broadcast();
-        scheduleBotsIfNeeded();
+        afterAdvance();
     }
 
     public synchronized void play(int seat, Move move) {
-        if (match == null || match.round() == null || seat != match.round().currentPlayer() || isBot[seat]) {
+        if (voteOpen || match == null || match.round() == null
+                || seat != match.round().currentPlayer() || isBot[seat]) {
             return;
         }
         match = MatchEngine.applyMove(match, seat, move);
-        broadcast();
-        scheduleBotsIfNeeded();
+        afterAdvance();
+    }
+
+    /** A human votes at a dealer boundary: true = stop the game here, false = keep playing. */
+    public synchronized void castStopVote(int seat, boolean stop) {
+        if (!voteOpen || seat < 0 || seat >= playerCount || isBot[seat]) {
+            return;
+        }
+        votes[seat] = stop;
+        if (allHumansVoted()) {
+            resolveVote();
+        } else {
+            broadcast();
+        }
+    }
+
+    static boolean stopVotePasses(int stopVotes, int humans) {
+        return stopVotes * 2 > humans;
     }
 
     /** A human left: hand their seat to a bot so the table keeps playing (spec §5.5). */
@@ -137,11 +160,83 @@ public final class GameRoom {
     }
 
     private boolean currentActorIsBot() {
-        if (match == null || MatchEngine.isComplete(match)) {
+        if (stopped || voteOpen || match == null || MatchEngine.isComplete(match)) {
             return false;
         }
         int actor = match.round() == null ? match.dealer() : match.round().currentPlayer();
         return isBot[actor];
+    }
+
+    private void afterAdvance() {
+        broadcast();
+        if (isVotableBoundary()) {
+            openVote();
+        } else {
+            scheduleBotsIfNeeded();
+        }
+    }
+
+    private boolean isVotableBoundary() {
+        return !voteOpen && !stopped && match != null
+                && !MatchEngine.isComplete(match) && MatchEngine.isDealerBoundary(match)
+                && humanSeatCount() > 0;
+    }
+
+    private int humanSeatCount() {
+        int count = 0;
+        for (int seat = 0; seat < playerCount; seat++) {
+            if (!isBot[seat]) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private void openVote() {
+        voteOpen = true;
+        votes = new Boolean[playerCount];
+        broadcast();
+        voteTimeout = scheduler.schedule(this::onVoteTimeout, VOTE_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+    }
+
+    private synchronized void onVoteTimeout() {
+        if (voteOpen) {
+            resolveVote();
+        }
+    }
+
+    private boolean allHumansVoted() {
+        for (int seat = 0; seat < playerCount; seat++) {
+            if (!isBot[seat] && votes[seat] == null) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private int stopVoteCount() {
+        int yes = 0;
+        for (int seat = 0; seat < playerCount; seat++) {
+            if (!isBot[seat] && Boolean.TRUE.equals(votes[seat])) {
+                yes++;
+            }
+        }
+        return yes;
+    }
+
+    private void resolveVote() {
+        voteOpen = false;
+        if (voteTimeout != null) {
+            voteTimeout.cancel(false);
+            voteTimeout = null;
+        }
+        if (stopVotePasses(stopVoteCount(), humanSeatCount())) {
+            stopped = true;
+            broadcast();
+        } else {
+            broadcast();
+            scheduleBotsIfNeeded();
+        }
     }
 
     private void scheduleBotsIfNeeded() {
@@ -160,8 +255,7 @@ public final class GameRoom {
             int seat = match.round().currentPlayer();
             match = MatchEngine.applyMove(match, seat, bot.chooseMove(match.round(), seat));
         }
-        broadcast();
-        scheduleBotsIfNeeded();
+        afterAdvance();
     }
 
     private int firstFreeSeat() {
@@ -198,7 +292,7 @@ public final class GameRoom {
     }
 
     private void maybeRecord() {
-        if (recorder == null || recorded || match == null || !MatchEngine.isComplete(match)) {
+        if (recorder == null || recorded || match == null || !(stopped || MatchEngine.isComplete(match))) {
             return;
         }
         recorded = true;
@@ -231,15 +325,24 @@ public final class GameRoom {
         view.put("plannedRounds", match.plannedRounds());
         view.put("totals", toList(match.totals()));
 
-        if (MatchEngine.isComplete(match)) {
+        if (stopped || MatchEngine.isComplete(match)) {
             view.put("standings", standings());
             return view;
+        }
+
+        if (voteOpen) {
+            Map<String, Object> vote = new LinkedHashMap<>();
+            vote.put("open", true);
+            vote.put("humans", humanSeatCount());
+            vote.put("stopVotes", stopVoteCount());
+            vote.put("youVoted", isBot[seat] ? null : votes[seat]);
+            view.put("stopVote", vote);
         }
 
         RoundState round = match.round();
         if (round == null) {
             view.put("currentActor", match.dealer());
-            if (seat == match.dealer()) {
+            if (seat == match.dealer() && !voteOpen) {
                 view.put("availableContracts", availableContracts());
             }
             return view;
@@ -270,7 +373,7 @@ public final class GameRoom {
         if (match == null) {
             return "LOBBY";
         }
-        if (MatchEngine.isComplete(match)) {
+        if (stopped || MatchEngine.isComplete(match)) {
             return "GAME_OVER";
         }
         return match.round() == null ? "CONTRACT_SELECTION" : "PLAYING";
