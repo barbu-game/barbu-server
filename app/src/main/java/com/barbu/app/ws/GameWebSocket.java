@@ -1,5 +1,7 @@
 package com.barbu.app.ws;
 
+import com.barbu.app.auth.JwtVerifier;
+import com.barbu.app.persistence.Repositories.UserRepository;
 import com.barbu.app.protocol.Codec;
 import com.barbu.app.room.GameRoom;
 import com.barbu.app.room.InMemoryMatchmaker;
@@ -22,17 +24,38 @@ public class GameWebSocket {
 
     private final RoomManager rooms;
     private final InMemoryMatchmaker matchmaker;
+    private final JwtVerifier jwtVerifier;
+    private final UserRepository users;
     private final ObjectMapper mapper;
 
-    public GameWebSocket(RoomManager rooms, InMemoryMatchmaker matchmaker, ObjectMapper mapper) {
+    public GameWebSocket(RoomManager rooms, InMemoryMatchmaker matchmaker,
+                         JwtVerifier jwtVerifier, UserRepository users, ObjectMapper mapper) {
         this.rooms = rooms;
         this.matchmaker = matchmaker;
+        this.jwtVerifier = jwtVerifier;
+        this.users = users;
         this.mapper = mapper;
     }
 
     @OnOpen
     public void onOpen(WebSocketSession session) {
-        // The client introduces itself with a createRoom or join command.
+        // The client may authenticate with an "auth" command, then create or join.
+    }
+
+    private void authenticate(WebSocketSession session, String token) {
+        jwtVerifier.usernameOf(token).ifPresent(username ->
+                users.findByUsername(username).ifPresent(user -> {
+                    session.put("username", username);
+                    session.put("userId", user.id());
+                }));
+    }
+
+    private String accountNameOr(WebSocketSession session, Object fallback) {
+        return session.get("username", String.class).orElse(asString(fallback));
+    }
+
+    private Long accountId(WebSocketSession session) {
+        return session.get("userId", Long.class).orElse(null);
     }
 
     @OnMessage
@@ -48,20 +71,23 @@ public class GameWebSocket {
 
         String type = String.valueOf(command.get("type"));
         switch (type) {
+            case "auth" -> authenticate(session, asString(command.get("token")));
             case "createRoom" -> {
+                authenticate(session, asString(command.get("token")));
                 GameRoom room = rooms.create(asInt(command.get("playerCount"), 4));
-                int seat = room.addHuman(session, asString(command.get("name")));
+                int seat = room.addHuman(session, accountNameOr(session, command.get("name")), accountId(session));
                 bind(session, room.id(), seat);
                 sendJoined(session, room.id(), seat);
                 room.broadcast();
             }
             case "join" -> {
+                authenticate(session, asString(command.get("token")));
                 GameRoom room = rooms.get(asString(command.get("roomId")));
                 if (room == null) {
                     sendError(session, "room not found");
                     return;
                 }
-                int seat = room.addHuman(session, asString(command.get("name")));
+                int seat = room.addHuman(session, accountNameOr(session, command.get("name")), accountId(session));
                 if (seat < 0) {
                     sendError(session, "room is full");
                     return;
@@ -70,8 +96,10 @@ public class GameWebSocket {
                 sendJoined(session, room.id(), seat);
                 room.broadcast();
             }
-            case "enqueueMatchmaking" -> matchmaker.enqueue(
-                    session, asString(command.get("name")), asInt(command.get("size"), 4));
+            case "enqueueMatchmaking" -> {
+                authenticate(session, asString(command.get("token")));
+                matchmaker.enqueue(session, accountNameOr(session, command.get("name")), asInt(command.get("size"), 4));
+            }
             case "cancelMatchmaking" -> matchmaker.cancel(session);
             case "addBot" -> withRoom(session, room -> {
                 room.addBot();

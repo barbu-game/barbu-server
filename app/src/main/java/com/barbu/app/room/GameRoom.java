@@ -43,6 +43,7 @@ public final class GameRoom {
 
     private final String[] names;
     private final boolean[] isBot;
+    private final Long[] userIds;
     private final WebSocketSession[] sessions;
 
     private MatchState match;
@@ -62,6 +63,7 @@ public final class GameRoom {
         this.recorder = recorder;
         this.names = new String[playerCount];
         this.isBot = new boolean[playerCount];
+        this.userIds = new Long[playerCount];
         this.sessions = new WebSocketSession[playerCount];
     }
 
@@ -69,13 +71,14 @@ public final class GameRoom {
         return id;
     }
 
-    public synchronized int addHuman(WebSocketSession session, String name) {
+    public synchronized int addHuman(WebSocketSession session, String name, Long userId) {
         int seat = firstFreeSeat();
         if (seat < 0) {
             return -1;
         }
         sessions[seat] = session;
         names[seat] = name == null || name.isBlank() ? "Player " + seat : name;
+        userIds[seat] = userId;
         isBot[seat] = false;
         return seat;
     }
@@ -298,7 +301,7 @@ public final class GameRoom {
         recorded = true;
         List<MatchRecorder.PlayerInfo> players = new ArrayList<>(playerCount);
         for (int seat = 0; seat < playerCount; seat++) {
-            players.add(new MatchRecorder.PlayerInfo(seat, names[seat], isBot[seat], null));
+            players.add(new MatchRecorder.PlayerInfo(seat, names[seat], isBot[seat], userIds[seat]));
         }
         try {
             recorder.record("private", match, players);

@@ -88,7 +88,9 @@ public class InMemoryMatchmaker {
 
         GameRoom room = rooms.create(size);
         for (Waiting w : taken) {
-            int seat = room.addHuman(w.session(), w.name());
+            String name = w.session().get("username", String.class).orElse(w.name());
+            Long userId = w.session().get("userId", Long.class).orElse(null);
+            int seat = room.addHuman(w.session(), name, userId);
             w.session().put("roomId", room.id());
             w.session().put("seat", seat);
         }
