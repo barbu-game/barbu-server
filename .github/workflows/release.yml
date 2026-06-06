@@ -11,6 +11,8 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -44,6 +46,24 @@ jobs:
           tag_name: v${{ steps.version.outputs.version }}
           files: ${{ steps.spec.outputs.path }}
 
-      # Downstream (mirrors getout): a reusable workflow runs Orval on this spec and
-      # publishes @barbu/barbu-api to GitHub Packages (npm.pkg.github.com). barbu-web
-      # pins that version, so any contract drift breaks barbu-web's typecheck.
+      - name: Stage the spec under a stable name
+        run: cp "${{ steps.spec.outputs.path }}" openapi.yml
+
+      - name: Upload the spec for the publish job
+        uses: actions/upload-artifact@v4
+        with:
+          name: openapi-spec
+          path: openapi.yml
+
+  # Downstream (getout pattern): generate the typed client from this spec and publish
+  # @barbu-game/barbu-api to GitHub Packages. barbu-web pins it, so any contract drift
+  # breaks barbu-web's typecheck.
+  publish-api:
+    needs: release
+    permissions:
+      contents: read
+      packages: write
+    uses: barbu-game/barbu-actions/.github/workflows/publish-api.yml@main
+    with:
+      version: ${{ needs.release.outputs.version }}
+    secrets: inherit
