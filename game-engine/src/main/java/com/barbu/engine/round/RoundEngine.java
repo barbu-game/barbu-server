@@ -39,6 +39,11 @@ public final class RoundEngine {
         };
     }
 
+    /** Clear a displayed, finished trick so its taker can lead the next one (trick-taking only). */
+    public static RoundState collectTrick(RoundState state) {
+        return state instanceof TrickTakingState t ? TrickTakingRules.collectTrick(t) : state;
+    }
+
     public static RoundResult score(RoundState state) {
         return switch (state) {
             case TrickTakingState t -> RoundResult.fromMap(t.contract(), TrickTakingRules.score(t));

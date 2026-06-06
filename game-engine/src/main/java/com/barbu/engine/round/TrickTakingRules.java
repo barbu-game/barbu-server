@@ -65,13 +65,24 @@ public final class TrickTakingRules {
         List<List<Card>> captured = mutableCopy(state.captured());
 
         if (trick.isComplete()) {
-            int winner = trick.winner();
-            captured.get(winner).addAll(trick.cards());
-            // Keep the completed trick on the table; the winner is the next to act.
-            return new TrickTakingState(state.contract(), hands, trick, captured, winner);
+            int taker = trick.taker();
+            captured.get(taker).addAll(trick.cards());
+            // Keep the completed trick on the table; the taker is the next to act.
+            return new TrickTakingState(state.contract(), hands, trick, captured, taker);
         }
         return new TrickTakingState(state.contract(), hands, trick, captured,
                 Seats.next(seat, state.playerCount()));
+    }
+
+    /** Clear a finished trick (already captured) so the taker can lead a fresh one. */
+    public static RoundState collectTrick(TrickTakingState state) {
+        Trick trick = state.currentTrick();
+        if (!trick.isComplete()) {
+            return state;
+        }
+        int taker = trick.taker();
+        return new TrickTakingState(state.contract(), state.hands(),
+                Trick.startedBy(taker, state.playerCount()), state.captured(), taker);
     }
 
     public static Map<Integer, Integer> score(TrickTakingState state) {

@@ -33,7 +33,9 @@ public record Trick(int leader, List<Card> cards, int playerCount) {
         return (leader + index) % playerCount;
     }
 
-    public int winner() {
+    /** Seat that takes the trick: the highest card of the led suit. In Barbu's negative
+     *  contracts this is usually a penalty, not a win — so it is the "taker", not a "winner". */
+    public int taker() {
         Suit led = ledSuit();
         int bestIndex = 0;
         int bestStrength = -1;

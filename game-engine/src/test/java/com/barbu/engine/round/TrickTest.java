@@ -36,7 +36,7 @@ class TrickTest {
                 .withCard(new Card(Suit.SPADES, Rank.ACE))
                 .withCard(new Card(Suit.HEARTS, Rank.NINE));
         assertTrue(t.isComplete());
-        assertEquals(2, t.winner());
+        assertEquals(2, t.taker());
     }
 
     @Test

@@ -81,6 +81,16 @@ public final class MatchEngine {
                 m.plannedRounds(), m.playedByDealer(), round, m.totals(), m.history());
     }
 
+    /** Clear a displayed, finished trick so its taker can lead the next one. */
+    public static MatchState collectTrick(MatchState m) {
+        if (m.round() == null) {
+            return m;
+        }
+        RoundState round = RoundEngine.collectTrick(m.round());
+        return new MatchState(m.playerCount(), m.seed(), m.dealer(), m.roundNumber(),
+                m.plannedRounds(), m.playedByDealer(), round, m.totals(), m.history());
+    }
+
     /** Score and close the current round if it is complete; otherwise a no-op. */
     public static MatchState settle(MatchState m) {
         if (m.round() == null || !m.round().isComplete()) {

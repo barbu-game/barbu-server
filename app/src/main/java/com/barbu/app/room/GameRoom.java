@@ -50,6 +50,7 @@ public final class GameRoom {
     private MatchState match;
     private boolean recorded;
     private boolean stopped;
+    private boolean trickResolving;
     private boolean voteOpen;
     private Boolean[] votes;
     private ScheduledFuture<?> voteTimeout;
@@ -116,7 +117,7 @@ public final class GameRoom {
     }
 
     public synchronized void play(int seat, Move move) {
-        if (voteOpen || match == null || match.round() == null
+        if (voteOpen || trickResolving || match == null || match.round() == null
                 || seat != match.round().currentPlayer() || isBot[seat]) {
             return;
         }
@@ -164,7 +165,7 @@ public final class GameRoom {
     }
 
     private boolean currentActorIsBot() {
-        if (stopped || voteOpen || match == null || MatchEngine.isComplete(match)) {
+        if (stopped || voteOpen || trickResolving || match == null || MatchEngine.isComplete(match)) {
             return false;
         }
         int actor = match.round() == null ? match.dealer() : match.round().currentPlayer();
@@ -172,15 +173,33 @@ public final class GameRoom {
     }
 
     private void afterAdvance() {
-        broadcast();
         if (roundJustCompleted()) {
+            broadcast();
             // Let everyone see the final trick (who took it) before scoring the round.
             scheduler.schedule(this::settleStep, roundEndPauseMs(), TimeUnit.MILLISECONDS);
-        } else if (isVotableBoundary()) {
-            openVote();
+        } else if (trickPending()) {
+            // Hold the finished trick on the table; nobody acts until it is collected.
+            trickResolving = true;
+            broadcast();
+            scheduler.schedule(this::releaseTrick, trickPauseMs(), TimeUnit.MILLISECONDS);
         } else {
-            scheduleBotsIfNeeded();
+            broadcast();
+            if (isVotableBoundary()) {
+                openVote();
+            } else {
+                scheduleBotsIfNeeded();
+            }
         }
+    }
+
+    private synchronized void releaseTrick() {
+        if (!trickResolving) {
+            return;
+        }
+        trickResolving = false;
+        match = MatchEngine.collectTrick(match);
+        broadcast();
+        scheduleBotsIfNeeded();
     }
 
     private synchronized void settleStep() {
@@ -200,18 +219,18 @@ public final class GameRoom {
         return match != null && match.round() != null && match.round().isComplete();
     }
 
-    /** A trick is finished but still displayed; the winner has not led the next one yet. */
+    /** A trick is finished but still displayed; the taker has not led the next one yet. */
     private boolean trickPending() {
         return match != null && match.round() instanceof TrickTakingState t
                 && t.currentTrick().isComplete() && !t.isComplete();
     }
 
     private long trickPauseMs() {
-        return botDelayMs == 0 ? 0 : 1400;
+        return botDelayMs == 0 ? 0 : 2000;
     }
 
     private long roundEndPauseMs() {
-        return botDelayMs == 0 ? 0 : 2200;
+        return botDelayMs == 0 ? 0 : 2500;
     }
 
     private boolean isVotableBoundary() {
@@ -279,8 +298,7 @@ public final class GameRoom {
 
     private void scheduleBotsIfNeeded() {
         if (currentActorIsBot()) {
-            long delay = trickPending() ? trickPauseMs() : botDelayMs;
-            scheduler.schedule(this::botStep, delay, TimeUnit.MILLISECONDS);
+            scheduler.schedule(this::botStep, botDelayMs, TimeUnit.MILLISECONDS);
         }
     }
 
@@ -404,7 +422,9 @@ public final class GameRoom {
             view.put("board", Codec.boardToMap(m.board()));
         }
 
-        if (round.currentPlayer() == seat) {
+        if (trickResolving) {
+            view.put("resolving", true);
+        } else if (round.currentPlayer() == seat) {
             List<Map<String, Object>> moves = new ArrayList<>();
             for (Move move : RoundEngine.legalMoves(round, seat)) {
                 moves.add(Codec.moveToMap(move));
@@ -475,7 +495,7 @@ public final class GameRoom {
         view.put("plays", plays);
         if (trick.isComplete()) {
             view.put("complete", true);
-            view.put("winner", trick.winner());
+            view.put("taker", trick.taker());
         }
         return view;
     }
