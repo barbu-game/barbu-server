@@ -1,10 +1,11 @@
 package com.barbu.engine.model;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import com.barbu.engine.card.Card;
 import com.barbu.engine.card.Rank;
 import com.barbu.engine.card.Suit;
 import org.junit.jupiter.api.Test;
-import static org.junit.jupiter.api.Assertions.*;
 
 class ModelTest {
     @Test
@@ -42,7 +43,7 @@ class ModelTest {
                 assertTrue(ranking[p] < ranking[p - 1], "n=" + n + " not strictly descending");
             }
         }
-        assertArrayEquals(new int[]{15, 5, -5, -15}, ScoringConfig.montanteRanking(4));
+        assertArrayEquals(new int[] {15, 5, -5, -15}, ScoringConfig.montanteRanking(4));
     }
 
     @Test

@@ -1,14 +1,13 @@
 package com.barbu.engine.match;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import com.barbu.engine.model.Contract;
 import com.barbu.engine.round.RoundState;
-import org.junit.jupiter.api.Test;
-
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
 
 class MatchEngineTest {
     @Test

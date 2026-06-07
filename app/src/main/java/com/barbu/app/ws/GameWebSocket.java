@@ -14,7 +14,6 @@ import io.micronaut.websocket.annotation.OnClose;
 import io.micronaut.websocket.annotation.OnMessage;
 import io.micronaut.websocket.annotation.OnOpen;
 import io.micronaut.websocket.annotation.ServerWebSocket;
-
 import java.util.Map;
 
 @ServerWebSocket("/ws/game")
@@ -27,8 +26,12 @@ public class GameWebSocket {
     private final UserRepository users;
     private final ObjectMapper mapper;
 
-    public GameWebSocket(RoomManager rooms, InMemoryMatchmaker matchmaker,
-                         JwtVerifier jwtVerifier, UserRepository users, ObjectMapper mapper) {
+    public GameWebSocket(
+            RoomManager rooms,
+            InMemoryMatchmaker matchmaker,
+            JwtVerifier jwtVerifier,
+            UserRepository users,
+            ObjectMapper mapper) {
         this.rooms = rooms;
         this.matchmaker = matchmaker;
         this.jwtVerifier = jwtVerifier;
@@ -42,8 +45,9 @@ public class GameWebSocket {
     }
 
     private void authenticate(WebSocketSession session, String token) {
-        jwtVerifier.usernameOf(token).ifPresent(username ->
-                users.findByUsername(username).ifPresent(user -> {
+        jwtVerifier
+                .usernameOf(token)
+                .ifPresent(username -> users.findByUsername(username).ifPresent(user -> {
                     session.put("username", username);
                     session.put("userId", user.id());
                 }));
@@ -100,19 +104,24 @@ public class GameWebSocket {
                 matchmaker.enqueue(session, accountNameOr(session, command.get("name")), asInt(command.get("size"), 4));
             }
             case "cancelMatchmaking" -> matchmaker.cancel(session);
-            case "addBot" -> withRoom(session, room -> {
-                room.addBot();
-                room.broadcast();
-            });
-            case "start" -> withRoom(session, room -> {
-                if (!room.start(rooms.newSeed())) {
-                    sendError(session, "cannot start (seats must all be filled)");
-                }
-            });
-            case "play" -> withRoomSeat(session, (room, seat) ->
-                    room.play(seat, Codec.parseMove((Map<String, Object>) command.get("move"))));
-            case "castStopVote" -> withRoomSeat(session, (room, seat) ->
-                    room.castStopVote(seat, Boolean.TRUE.equals(command.get("stop"))));
+            case "addBot" ->
+                withRoom(session, room -> {
+                    room.addBot();
+                    room.broadcast();
+                });
+            case "start" ->
+                withRoom(session, room -> {
+                    if (!room.start(rooms.newSeed())) {
+                        sendError(session, "cannot start (seats must all be filled)");
+                    }
+                });
+            case "play" ->
+                withRoomSeat(
+                        session,
+                        (room, seat) -> room.play(seat, Codec.parseMove((Map<String, Object>) command.get("move"))));
+            case "castStopVote" ->
+                withRoomSeat(
+                        session, (room, seat) -> room.castStopVote(seat, Boolean.TRUE.equals(command.get("stop"))));
             default -> sendError(session, "unknown command: " + type);
         }
     }

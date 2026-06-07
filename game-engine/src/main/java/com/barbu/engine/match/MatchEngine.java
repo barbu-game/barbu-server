@@ -9,7 +9,6 @@ import com.barbu.engine.model.Seats;
 import com.barbu.engine.round.RoundEngine;
 import com.barbu.engine.round.RoundResult;
 import com.barbu.engine.round.RoundState;
-
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumSet;
@@ -17,8 +16,7 @@ import java.util.List;
 import java.util.Set;
 
 public final class MatchEngine {
-    private MatchEngine() {
-    }
+    private MatchEngine() {}
 
     public static MatchState newMatch(int playerCount, long seed) {
         return newMatch(playerCount, seed, Contract.values().length * playerCount);
@@ -28,8 +26,16 @@ public final class MatchEngine {
         if (playerCount < Seats.MIN || playerCount > Seats.MAX) {
             throw new IllegalArgumentException("playerCount out of range: " + playerCount);
         }
-        return new MatchState(playerCount, seed, 0, 0, plannedRounds,
-                EnumSet.noneOf(Contract.class), null, new int[playerCount], List.of());
+        return new MatchState(
+                playerCount,
+                seed,
+                0,
+                0,
+                plannedRounds,
+                EnumSet.noneOf(Contract.class),
+                null,
+                new int[playerCount],
+                List.of());
     }
 
     public static boolean isComplete(MatchState m) {
@@ -70,8 +76,16 @@ public final class MatchEngine {
                 ? RoundEngine.startMontante(hands, RoundEngine.eightOfDiamondsHolder(hands))
                 : RoundEngine.startTrickTaking(contract, hands, Seats.next(m.dealer(), m.playerCount()));
 
-        return new MatchState(m.playerCount(), m.seed(), m.dealer(), m.roundNumber(),
-                m.plannedRounds(), m.playedByDealer(), round, m.totals(), m.history());
+        return new MatchState(
+                m.playerCount(),
+                m.seed(),
+                m.dealer(),
+                m.roundNumber(),
+                m.plannedRounds(),
+                m.playedByDealer(),
+                round,
+                m.totals(),
+                m.history());
     }
 
     public static MatchState applyMove(MatchState m, int seat, Move move) {
@@ -80,8 +94,16 @@ public final class MatchEngine {
         }
         RoundState round = RoundEngine.applyMove(m.round(), seat, move);
         if (!round.isComplete()) {
-            return new MatchState(m.playerCount(), m.seed(), m.dealer(), m.roundNumber(),
-                    m.plannedRounds(), m.playedByDealer(), round, m.totals(), m.history());
+            return new MatchState(
+                    m.playerCount(),
+                    m.seed(),
+                    m.dealer(),
+                    m.roundNumber(),
+                    m.plannedRounds(),
+                    m.playedByDealer(),
+                    round,
+                    m.totals(),
+                    m.history());
         }
         return settleRound(m, round);
     }
@@ -92,8 +114,16 @@ public final class MatchEngine {
             throw new IllegalStateException("no round in progress");
         }
         RoundState round = RoundEngine.applyMove(m.round(), seat, move);
-        return new MatchState(m.playerCount(), m.seed(), m.dealer(), m.roundNumber(),
-                m.plannedRounds(), m.playedByDealer(), round, m.totals(), m.history());
+        return new MatchState(
+                m.playerCount(),
+                m.seed(),
+                m.dealer(),
+                m.roundNumber(),
+                m.plannedRounds(),
+                m.playedByDealer(),
+                round,
+                m.totals(),
+                m.history());
     }
 
     /** Clear a displayed, finished trick so its taker can lead the next one. */
@@ -102,8 +132,16 @@ public final class MatchEngine {
             return m;
         }
         RoundState round = RoundEngine.collectTrick(m.round());
-        return new MatchState(m.playerCount(), m.seed(), m.dealer(), m.roundNumber(),
-                m.plannedRounds(), m.playedByDealer(), round, m.totals(), m.history());
+        return new MatchState(
+                m.playerCount(),
+                m.seed(),
+                m.dealer(),
+                m.roundNumber(),
+                m.plannedRounds(),
+                m.playedByDealer(),
+                round,
+                m.totals(),
+                m.history());
     }
 
     /** Score and close the current round if it is complete; otherwise a no-op. */
@@ -153,8 +191,16 @@ public final class MatchEngine {
             playedByDealer = EnumSet.noneOf(Contract.class);
         }
 
-        return new MatchState(m.playerCount(), m.seed(), dealer, m.roundNumber() + 1,
-                m.plannedRounds(), playedByDealer, null, totals, history);
+        return new MatchState(
+                m.playerCount(),
+                m.seed(),
+                dealer,
+                m.roundNumber() + 1,
+                m.plannedRounds(),
+                playedByDealer,
+                null,
+                totals,
+                history);
     }
 
     private static List<List<Card>> deal(int playerCount, long seed) {

@@ -1,15 +1,14 @@
 package com.barbu.engine.round;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import com.barbu.engine.card.Card;
 import com.barbu.engine.card.Rank;
 import com.barbu.engine.card.Suit;
 import com.barbu.engine.model.Contract;
 import com.barbu.engine.model.Move;
-import org.junit.jupiter.api.Test;
-
 import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
 
 class TrickTakingRulesTest {
     private static Card c(Suit s, Rank r) {
@@ -21,14 +20,12 @@ class TrickTakingRulesTest {
         List<List<Card>> hands = List.of(
                 List.of(c(Suit.HEARTS, Rank.TWO)),
                 List.of(c(Suit.HEARTS, Rank.KING), c(Suit.SPADES, Rank.ACE)),
-                List.of(), List.of());
+                List.of(),
+                List.of());
         TrickTakingState s = new TrickTakingState(
-                Contract.NO_TRICKS, hands,
-                Trick.startedBy(0, 4).withCard(c(Suit.HEARTS, Rank.TWO)),
-                noCapture(4), 1);
+                Contract.NO_TRICKS, hands, Trick.startedBy(0, 4).withCard(c(Suit.HEARTS, Rank.TWO)), noCapture(4), 1);
 
-        assertEquals(List.of(new Move.PlayCard(c(Suit.HEARTS, Rank.KING))),
-                TrickTakingRules.legalMoves(s, 1));
+        assertEquals(List.of(new Move.PlayCard(c(Suit.HEARTS, Rank.KING))), TrickTakingRules.legalMoves(s, 1));
     }
 
     @Test
@@ -36,11 +33,10 @@ class TrickTakingRulesTest {
         List<List<Card>> hands = List.of(
                 List.of(c(Suit.HEARTS, Rank.TWO)),
                 List.of(c(Suit.SPADES, Rank.ACE), c(Suit.CLUBS, Rank.KING)),
-                List.of(), List.of());
+                List.of(),
+                List.of());
         TrickTakingState s = new TrickTakingState(
-                Contract.NO_TRICKS, hands,
-                Trick.startedBy(0, 4).withCard(c(Suit.HEARTS, Rank.TWO)),
-                noCapture(4), 1);
+                Contract.NO_TRICKS, hands, Trick.startedBy(0, 4).withCard(c(Suit.HEARTS, Rank.TWO)), noCapture(4), 1);
 
         assertEquals(2, TrickTakingRules.legalMoves(s, 1).size());
     }
@@ -67,9 +63,7 @@ class TrickTakingRulesTest {
 
     @Test
     void two_player_trick_completes_after_two_cards() {
-        List<List<Card>> hands = List.of(
-                List.of(c(Suit.HEARTS, Rank.TWO)),
-                List.of(c(Suit.HEARTS, Rank.KING)));
+        List<List<Card>> hands = List.of(List.of(c(Suit.HEARTS, Rank.TWO)), List.of(c(Suit.HEARTS, Rank.KING)));
         RoundState s = new TrickTakingState(Contract.NO_TRICKS, hands, Trick.startedBy(0, 2), noCapture(2), 0);
         s = TrickTakingRules.applyMove((TrickTakingState) s, 0, play(Suit.HEARTS, Rank.TWO));
         s = TrickTakingRules.applyMove((TrickTakingState) s, 1, play(Suit.HEARTS, Rank.KING));
@@ -82,14 +76,15 @@ class TrickTakingRulesTest {
         List<List<Card>> hands = List.of(
                 List.of(c(Suit.HEARTS, Rank.TWO)),
                 List.of(c(Suit.HEARTS, Rank.KING), c(Suit.SPADES, Rank.ACE)),
-                List.of(), List.of());
+                List.of(),
+                List.of());
         TrickTakingState s = new TrickTakingState(
-                Contract.NO_TRICKS, hands,
-                Trick.startedBy(0, 4).withCard(c(Suit.HEARTS, Rank.TWO)),
-                noCapture(4), 1);
+                Contract.NO_TRICKS, hands, Trick.startedBy(0, 4).withCard(c(Suit.HEARTS, Rank.TWO)), noCapture(4), 1);
 
-        assertThrows(IllegalArgumentException.class, () -> TrickTakingRules.applyMove(s, 1, play(Suit.SPADES, Rank.ACE)));
-        assertThrows(IllegalArgumentException.class, () -> TrickTakingRules.applyMove(s, 2, play(Suit.HEARTS, Rank.KING)));
+        assertThrows(
+                IllegalArgumentException.class, () -> TrickTakingRules.applyMove(s, 1, play(Suit.SPADES, Rank.ACE)));
+        assertThrows(
+                IllegalArgumentException.class, () -> TrickTakingRules.applyMove(s, 2, play(Suit.HEARTS, Rank.KING)));
     }
 
     @Test
@@ -104,18 +99,27 @@ class TrickTakingRulesTest {
     void score_hearts_queens_red_kings() {
         List<List<Card>> hearts = List.of(
                 List.of(c(Suit.HEARTS, Rank.TWO), c(Suit.HEARTS, Rank.KING), c(Suit.SPADES, Rank.ACE)),
-                List.of(), List.of(), List.of());
-        assertEquals(-4, TrickTakingRules.score(completed(Contract.NO_HEARTS, hearts)).get(0));
+                List.of(),
+                List.of(),
+                List.of());
+        assertEquals(
+                -4,
+                TrickTakingRules.score(completed(Contract.NO_HEARTS, hearts)).get(0));
 
         List<List<Card>> kings = List.of(
                 List.of(c(Suit.HEARTS, Rank.KING), c(Suit.DIAMONDS, Rank.KING), c(Suit.SPADES, Rank.KING)),
-                List.of(), List.of(), List.of());
-        assertEquals(-20, TrickTakingRules.score(completed(Contract.NO_RED_KINGS, kings)).get(0));
+                List.of(),
+                List.of(),
+                List.of());
+        assertEquals(
+                -20,
+                TrickTakingRules.score(completed(Contract.NO_RED_KINGS, kings)).get(0));
 
         List<List<Card>> queens = List.of(
-                List.of(c(Suit.SPADES, Rank.QUEEN), c(Suit.HEARTS, Rank.QUEEN)),
-                List.of(), List.of(), List.of());
-        assertEquals(-12, TrickTakingRules.score(completed(Contract.NO_QUEENS, queens)).get(0));
+                List.of(c(Suit.SPADES, Rank.QUEEN), c(Suit.HEARTS, Rank.QUEEN)), List.of(), List.of(), List.of());
+        assertEquals(
+                -12,
+                TrickTakingRules.score(completed(Contract.NO_QUEENS, queens)).get(0));
     }
 
     private static Move play(Suit s, Rank r) {
@@ -137,8 +141,7 @@ class TrickTakingRulesTest {
     }
 
     private static TrickTakingState completed(Contract contract, List<List<Card>> captured) {
-        return new TrickTakingState(contract,
-                List.of(List.of(), List.of(), List.of(), List.of()),
-                Trick.startedBy(0, 4), captured, 0);
+        return new TrickTakingState(
+                contract, List.of(List.of(), List.of(), List.of(), List.of()), Trick.startedBy(0, 4), captured, 0);
     }
 }

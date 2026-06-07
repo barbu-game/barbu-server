@@ -5,13 +5,11 @@ import com.barbu.engine.card.Rank;
 import com.barbu.engine.card.Suit;
 import com.barbu.engine.model.Contract;
 import com.barbu.engine.model.Move;
-
 import java.util.ArrayList;
 import java.util.List;
 
 public final class RoundEngine {
-    private RoundEngine() {
-    }
+    private RoundEngine() {}
 
     public static RoundState startTrickTaking(Contract contract, List<List<Card>> hands, int leader) {
         List<List<Card>> empty = new ArrayList<>();

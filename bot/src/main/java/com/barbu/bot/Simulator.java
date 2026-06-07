@@ -3,13 +3,11 @@ package com.barbu.bot;
 import com.barbu.engine.match.MatchEngine;
 import com.barbu.engine.match.MatchState;
 import com.barbu.engine.round.RoundState;
-
 import java.util.List;
 
 /** Plays full bot-vs-bot matches; runnable as a CLI for quick manual inspection. */
 public final class Simulator {
-    private Simulator() {
-    }
+    private Simulator() {}
 
     public static MatchState play(int playerCount, long seed, BotStrategy bot) {
         MatchState match = MatchEngine.newMatch(playerCount, seed);
@@ -30,8 +28,7 @@ public final class Simulator {
 
         MatchState match = play(playerCount, seed, new HeuristicBot());
 
-        System.out.printf("Barbu — %d players, seed %d, %d rounds%n",
-                playerCount, seed, match.roundNumber());
+        System.out.printf("Barbu — %d players, seed %d, %d rounds%n", playerCount, seed, match.roundNumber());
         List<Integer> standings = MatchEngine.standings(match);
         for (int rank = 0; rank < standings.size(); rank++) {
             int seat = standings.get(rank);

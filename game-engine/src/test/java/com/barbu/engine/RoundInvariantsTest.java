@@ -1,19 +1,18 @@
 package com.barbu.engine;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import com.barbu.engine.card.Card;
 import com.barbu.engine.card.Deck;
 import com.barbu.engine.model.Contract;
 import com.barbu.engine.round.RoundEngine;
 import com.barbu.engine.round.RoundState;
+import java.util.ArrayList;
+import java.util.List;
 import net.jqwik.api.ForAll;
 import net.jqwik.api.Property;
 import net.jqwik.api.constraints.IntRange;
 import net.jqwik.api.constraints.LongRange;
-
-import java.util.ArrayList;
-import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 class RoundInvariantsTest {
 
@@ -29,8 +28,7 @@ class RoundInvariantsTest {
 
     @Property
     void trick_taking_always_offers_a_legal_move_until_complete(
-            @ForAll @IntRange(min = 2, max = 10) int n,
-            @ForAll @LongRange(min = 0, max = 800) long seed) {
+            @ForAll @IntRange(min = 2, max = 10) int n, @ForAll @LongRange(min = 0, max = 800) long seed) {
         RoundState s = RoundEngine.startTrickTaking(Contract.NO_TRICKS, deal(n, seed), 1);
         while (!s.isComplete()) {
             List<com.barbu.engine.model.Move> legal = RoundEngine.legalMoves(s, s.currentPlayer());
@@ -41,13 +39,15 @@ class RoundInvariantsTest {
 
     @Property
     void no_tricks_total_equals_minus_two_per_trick(
-            @ForAll @IntRange(min = 2, max = 10) int n,
-            @ForAll @LongRange(min = 0, max = 400) long seed) {
+            @ForAll @IntRange(min = 2, max = 10) int n, @ForAll @LongRange(min = 0, max = 400) long seed) {
         List<List<Card>> hands = deal(n, seed);
         int tricks = hands.get(0).size();
         RoundState s = RoundEngine.startTrickTaking(Contract.NO_TRICKS, hands, 1);
         while (!s.isComplete()) {
-            s = RoundEngine.applyMove(s, s.currentPlayer(), RoundEngine.legalMoves(s, s.currentPlayer()).get(0));
+            s = RoundEngine.applyMove(
+                    s,
+                    s.currentPlayer(),
+                    RoundEngine.legalMoves(s, s.currentPlayer()).get(0));
         }
         int total = 0;
         for (int p : RoundEngine.score(s).points()) {
@@ -58,13 +58,15 @@ class RoundInvariantsTest {
 
     @Property
     void montante_always_terminates_and_is_zero_sum(
-            @ForAll @IntRange(min = 2, max = 10) int n,
-            @ForAll @LongRange(min = 0, max = 400) long seed) {
+            @ForAll @IntRange(min = 2, max = 10) int n, @ForAll @LongRange(min = 0, max = 400) long seed) {
         List<List<Card>> hands = deal(n, seed);
         RoundState s = RoundEngine.startMontante(hands, RoundEngine.eightOfDiamondsHolder(hands));
         int guard = 0;
         while (!s.isComplete()) {
-            s = RoundEngine.applyMove(s, s.currentPlayer(), RoundEngine.legalMoves(s, s.currentPlayer()).get(0));
+            s = RoundEngine.applyMove(
+                    s,
+                    s.currentPlayer(),
+                    RoundEngine.legalMoves(s, s.currentPlayer()).get(0));
             assertTrue(guard++ < 400, "montante did not terminate n=" + n + " seed=" + seed);
         }
         int total = 0;

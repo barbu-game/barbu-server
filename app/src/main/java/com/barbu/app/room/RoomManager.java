@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micronaut.context.annotation.Value;
 import jakarta.annotation.PreDestroy;
 import jakarta.inject.Singleton;
-
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
@@ -24,8 +23,8 @@ public class RoomManager {
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
     private final Random random = new Random();
 
-    public RoomManager(ObjectMapper mapper, MatchRecorder recorder,
-                       @Value("${barbu.bot-delay-ms:650}") long botDelayMs) {
+    public RoomManager(
+            ObjectMapper mapper, MatchRecorder recorder, @Value("${barbu.bot-delay-ms:650}") long botDelayMs) {
         this.mapper = mapper;
         this.recorder = recorder;
         this.botDelayMs = botDelayMs;

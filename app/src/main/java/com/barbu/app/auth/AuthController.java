@@ -9,7 +9,6 @@ import io.micronaut.http.annotation.Post;
 import io.micronaut.security.annotation.Secured;
 import io.micronaut.security.rules.SecurityRule;
 import jakarta.validation.constraints.NotBlank;
-
 import java.time.Instant;
 import java.util.Map;
 
@@ -27,8 +26,8 @@ public class AuthController {
         this.jwt = jwt;
     }
 
-    public record Credentials(@NotBlank String username, @NotBlank String password) {
-    }
+    public record Credentials(
+            @NotBlank String username, @NotBlank String password) {}
 
     @Post("/register")
     public HttpResponse<?> register(@Body Credentials creds) {
@@ -44,8 +43,7 @@ public class AuthController {
     public HttpResponse<?> login(@Body Credentials creds) {
         return users.findByUsername(creds.username())
                 .filter(u -> hasher.matches(creds.password(), u.passwordHash()))
-                .map(u -> HttpResponse.ok((Object) Map.of(
-                        "token", jwt.issue(u.username()), "username", u.username())))
+                .map(u -> HttpResponse.ok((Object) Map.of("token", jwt.issue(u.username()), "username", u.username())))
                 .orElseGet(() -> HttpResponse.unauthorized().body(Map.of("error", "invalid credentials")));
     }
 }

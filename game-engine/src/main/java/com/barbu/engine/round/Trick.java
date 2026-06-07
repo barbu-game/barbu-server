@@ -2,7 +2,6 @@ package com.barbu.engine.round;
 
 import com.barbu.engine.card.Card;
 import com.barbu.engine.card.Suit;
-
 import java.util.ArrayList;
 import java.util.List;
 

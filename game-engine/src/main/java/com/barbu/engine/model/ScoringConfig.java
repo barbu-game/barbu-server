@@ -5,8 +5,7 @@ package com.barbu.engine.model;
  * this class only — never the rules logic.
  */
 public final class ScoringConfig {
-    private ScoringConfig() {
-    }
+    private ScoringConfig() {}
 
     public static final int PER_TRICK = -2;
     public static final int PER_HEART = -2;

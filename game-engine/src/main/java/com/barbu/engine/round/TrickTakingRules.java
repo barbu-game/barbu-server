@@ -6,15 +6,13 @@ import com.barbu.engine.model.Contract;
 import com.barbu.engine.model.Move;
 import com.barbu.engine.model.ScoringConfig;
 import com.barbu.engine.model.Seats;
-
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 public final class TrickTakingRules {
-    private TrickTakingRules() {
-    }
+    private TrickTakingRules() {}
 
     public static List<Move> legalMoves(TrickTakingState state, int seat) {
         if (seat != state.currentPlayer()) {
@@ -70,8 +68,7 @@ public final class TrickTakingRules {
             // Keep the completed trick on the table; the taker is the next to act.
             return new TrickTakingState(state.contract(), hands, trick, captured, taker);
         }
-        return new TrickTakingState(state.contract(), hands, trick, captured,
-                Seats.next(seat, state.playerCount()));
+        return new TrickTakingState(state.contract(), hands, trick, captured, Seats.next(seat, state.playerCount()));
     }
 
     /** Clear a finished trick (already captured) so the taker can lead a fresh one. */
@@ -81,8 +78,8 @@ public final class TrickTakingRules {
             return state;
         }
         int taker = trick.taker();
-        return new TrickTakingState(state.contract(), state.hands(),
-                Trick.startedBy(taker, state.playerCount()), state.captured(), taker);
+        return new TrickTakingState(
+                state.contract(), state.hands(), Trick.startedBy(taker, state.playerCount()), state.captured(), taker);
     }
 
     public static Map<Integer, Integer> score(TrickTakingState state) {

@@ -4,7 +4,6 @@ import com.nimbusds.jose.crypto.MACVerifier;
 import com.nimbusds.jwt.SignedJWT;
 import io.micronaut.context.annotation.Value;
 import jakarta.inject.Singleton;
-
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.Optional;
@@ -14,8 +13,7 @@ public class JwtVerifier {
 
     private final byte[] secret;
 
-    public JwtVerifier(
-            @Value("${micronaut.security.token.jwt.signatures.secret.generator.secret}") String secret) {
+    public JwtVerifier(@Value("${micronaut.security.token.jwt.signatures.secret.generator.secret}") String secret) {
         this.secret = secret.getBytes(StandardCharsets.UTF_8);
     }
 

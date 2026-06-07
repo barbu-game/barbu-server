@@ -1,7 +1,8 @@
 package com.barbu.engine.card;
 
-import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
+
+import org.junit.jupiter.api.Test;
 
 class SuitTest {
     @Test

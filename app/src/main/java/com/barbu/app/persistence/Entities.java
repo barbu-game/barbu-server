@@ -4,22 +4,14 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.data.annotation.GeneratedValue;
 import io.micronaut.data.annotation.Id;
 import io.micronaut.data.annotation.MappedEntity;
-
 import java.time.Instant;
 
 /** Persisted records. Micronaut Data maps camelCase components to snake_case columns. */
 public final class Entities {
-    private Entities() {
-    }
+    private Entities() {}
 
     @MappedEntity("users")
-    public record UserEntity(
-            @Id @GeneratedValue Long id,
-            String username,
-            String passwordHash,
-            Instant createdAt
-    ) {
-    }
+    public record UserEntity(@Id @GeneratedValue Long id, String username, String passwordHash, Instant createdAt) {}
 
     @MappedEntity("games")
     public record GameEntity(
@@ -28,9 +20,7 @@ public final class Entities {
             int playerCount,
             String rulesetVersion,
             long seed,
-            Instant createdAt
-    ) {
-    }
+            Instant createdAt) {}
 
     @MappedEntity("game_players")
     public record GamePlayerEntity(
@@ -41,26 +31,12 @@ public final class Entities {
             String displayName,
             boolean isBot,
             int finalRank,
-            int finalScore
-    ) {
-    }
+            int finalScore) {}
 
     @MappedEntity("rounds")
     public record RoundEntity(
-            @Id @GeneratedValue Long id,
-            long gameId,
-            int roundNumber,
-            int dealerSeat,
-            String contract
-    ) {
-    }
+            @Id @GeneratedValue Long id, long gameId, int roundNumber, int dealerSeat, String contract) {}
 
     @MappedEntity("round_scores")
-    public record RoundScoreEntity(
-            @Id @GeneratedValue Long id,
-            long roundId,
-            int seat,
-            int points
-    ) {
-    }
+    public record RoundScoreEntity(@Id @GeneratedValue Long id, long roundId, int seat, int points) {}
 }

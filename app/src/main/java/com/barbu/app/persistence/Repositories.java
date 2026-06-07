@@ -8,12 +8,10 @@ import com.barbu.app.persistence.Entities.UserEntity;
 import io.micronaut.data.jdbc.annotation.JdbcRepository;
 import io.micronaut.data.model.query.builder.sql.Dialect;
 import io.micronaut.data.repository.CrudRepository;
-
 import java.util.Optional;
 
 public final class Repositories {
-    private Repositories() {
-    }
+    private Repositories() {}
 
     @JdbcRepository(dialect = Dialect.POSTGRES)
     public interface UserRepository extends CrudRepository<UserEntity, Long> {
@@ -23,8 +21,7 @@ public final class Repositories {
     }
 
     @JdbcRepository(dialect = Dialect.POSTGRES)
-    public interface GameRepository extends CrudRepository<GameEntity, Long> {
-    }
+    public interface GameRepository extends CrudRepository<GameEntity, Long> {}
 
     @JdbcRepository(dialect = Dialect.POSTGRES)
     public interface GamePlayerRepository extends CrudRepository<GamePlayerEntity, Long> {
@@ -37,6 +34,5 @@ public final class Repositories {
     }
 
     @JdbcRepository(dialect = Dialect.POSTGRES)
-    public interface RoundScoreRepository extends CrudRepository<RoundScoreEntity, Long> {
-    }
+    public interface RoundScoreRepository extends CrudRepository<RoundScoreEntity, Long> {}
 }

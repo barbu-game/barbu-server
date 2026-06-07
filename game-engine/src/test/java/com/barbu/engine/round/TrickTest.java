@@ -1,10 +1,11 @@
 package com.barbu.engine.round;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import com.barbu.engine.card.Card;
 import com.barbu.engine.card.Rank;
 import com.barbu.engine.card.Suit;
 import org.junit.jupiter.api.Test;
-import static org.junit.jupiter.api.Assertions.*;
 
 class TrickTest {
     @Test

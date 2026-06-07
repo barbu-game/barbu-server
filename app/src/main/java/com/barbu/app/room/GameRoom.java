@@ -17,7 +17,6 @@ import com.barbu.engine.round.TrickTakingRules;
 import com.barbu.engine.round.TrickTakingState;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micronaut.websocket.WebSocketSession;
-
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -56,8 +55,13 @@ public final class GameRoom {
     private Boolean[] votes;
     private ScheduledFuture<?> voteTimeout;
 
-    GameRoom(String id, int playerCount, ObjectMapper mapper, ScheduledExecutorService scheduler,
-             long botDelayMs, MatchRecorder recorder) {
+    GameRoom(
+            String id,
+            int playerCount,
+            ObjectMapper mapper,
+            ScheduledExecutorService scheduler,
+            long botDelayMs,
+            MatchRecorder recorder) {
         this.id = id;
         this.playerCount = playerCount;
         this.mapper = mapper;
@@ -110,8 +114,12 @@ public final class GameRoom {
     }
 
     public synchronized void play(int seat, Move move) {
-        if (voteOpen || trickResolving || match == null || match.round() == null
-                || seat != match.round().currentPlayer() || isBot[seat]) {
+        if (voteOpen
+                || trickResolving
+                || match == null
+                || match.round() == null
+                || seat != match.round().currentPlayer()
+                || isBot[seat]) {
             return;
         }
         match = MatchEngine.applyMoveNoSettle(match, seat, move);
@@ -158,8 +166,12 @@ public final class GameRoom {
     }
 
     private boolean currentActorIsBot() {
-        if (stopped || voteOpen || trickResolving || match == null
-                || MatchEngine.isComplete(match) || match.round() == null) {
+        if (stopped
+                || voteOpen
+                || trickResolving
+                || match == null
+                || MatchEngine.isComplete(match)
+                || match.round() == null) {
             return false;
         }
         return isBot[match.round().currentPlayer()];
@@ -232,8 +244,10 @@ public final class GameRoom {
 
     /** A trick is finished but still displayed; the taker has not led the next one yet. */
     private boolean trickPending() {
-        return match != null && match.round() instanceof TrickTakingState t
-                && t.currentTrick().isComplete() && !t.isComplete();
+        return match != null
+                && match.round() instanceof TrickTakingState t
+                && t.currentTrick().isComplete()
+                && !t.isComplete();
     }
 
     private long trickPauseMs() {
@@ -249,8 +263,11 @@ public final class GameRoom {
     }
 
     private boolean isVotableBoundary() {
-        return !voteOpen && !stopped && match != null
-                && !MatchEngine.isComplete(match) && MatchEngine.isDealerBoundary(match)
+        return !voteOpen
+                && !stopped
+                && match != null
+                && !MatchEngine.isComplete(match)
+                && MatchEngine.isDealerBoundary(match)
                 && humanSeatCount() > 0;
     }
 

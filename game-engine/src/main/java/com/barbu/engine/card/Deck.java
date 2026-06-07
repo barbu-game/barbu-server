@@ -7,8 +7,7 @@ import java.util.List;
 import java.util.Random;
 
 public final class Deck {
-    private Deck() {
-    }
+    private Deck() {}
 
     private static final List<Card> REMOVAL_ORDER = buildRemovalOrder();
 
@@ -37,8 +36,7 @@ public final class Deck {
 
     private static List<Card> buildRemovalOrder() {
         List<Card> order = full();
-        order.sort(Comparator
-                .comparingInt((Card c) -> c.rank().trickStrength())
+        order.sort(Comparator.comparingInt((Card c) -> c.rank().trickStrength())
                 .thenComparingInt(c -> suitRemovalPriority(c.suit())));
         return List.copyOf(order);
     }

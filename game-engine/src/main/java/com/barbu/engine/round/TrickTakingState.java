@@ -2,17 +2,12 @@ package com.barbu.engine.round;
 
 import com.barbu.engine.card.Card;
 import com.barbu.engine.model.Contract;
-
 import java.util.ArrayList;
 import java.util.List;
 
 public record TrickTakingState(
-        Contract contract,
-        List<List<Card>> hands,
-        Trick currentTrick,
-        List<List<Card>> captured,
-        int currentPlayer
-) implements RoundState {
+        Contract contract, List<List<Card>> hands, Trick currentTrick, List<List<Card>> captured, int currentPlayer)
+        implements RoundState {
 
     public TrickTakingState {
         hands = deepCopy(hands);

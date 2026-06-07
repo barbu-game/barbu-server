@@ -6,15 +6,13 @@ import com.barbu.engine.card.Suit;
 import com.barbu.engine.model.Move;
 import com.barbu.engine.model.ScoringConfig;
 import com.barbu.engine.model.Seats;
-
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 public final class MontanteRules {
-    private MontanteRules() {
-    }
+    private MontanteRules() {}
 
     private static final Card EIGHT_OF_DIAMONDS = new Card(Suit.DIAMONDS, Rank.EIGHT);
 

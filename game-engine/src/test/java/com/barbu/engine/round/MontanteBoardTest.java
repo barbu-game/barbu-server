@@ -1,10 +1,11 @@
 package com.barbu.engine.round;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import com.barbu.engine.card.Card;
 import com.barbu.engine.card.Rank;
 import com.barbu.engine.card.Suit;
 import org.junit.jupiter.api.Test;
-import static org.junit.jupiter.api.Assertions.*;
 
 class MontanteBoardTest {
     private static Card c(Suit s, Rank r) {
@@ -34,7 +35,7 @@ class MontanteBoardTest {
     @Test
     void extends_down_to_ace_and_up_to_king() {
         MontanteBoard b = MontanteBoard.empty().place(c(Suit.SPADES, Rank.EIGHT));
-        for (Rank r : new Rank[]{Rank.SEVEN, Rank.SIX, Rank.FIVE, Rank.FOUR, Rank.THREE, Rank.TWO, Rank.ACE}) {
+        for (Rank r : new Rank[] {Rank.SEVEN, Rank.SIX, Rank.FIVE, Rank.FOUR, Rank.THREE, Rank.TWO, Rank.ACE}) {
             assertTrue(b.isPlayable(c(Suit.SPADES, r)), "down to " + r);
             b = b.place(c(Suit.SPADES, r));
         }

@@ -7,7 +7,6 @@ import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 import io.micronaut.context.annotation.Value;
 import jakarta.inject.Singleton;
-
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -24,8 +23,7 @@ public class JwtIssuer {
 
     private final byte[] secret;
 
-    public JwtIssuer(
-            @Value("${micronaut.security.token.jwt.signatures.secret.generator.secret}") String secret) {
+    public JwtIssuer(@Value("${micronaut.security.token.jwt.signatures.secret.generator.secret}") String secret) {
         this.secret = secret.getBytes(StandardCharsets.UTF_8);
     }
 

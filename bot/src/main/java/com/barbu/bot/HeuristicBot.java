@@ -10,7 +10,6 @@ import com.barbu.engine.round.RoundEngine;
 import com.barbu.engine.round.RoundState;
 import com.barbu.engine.round.Trick;
 import com.barbu.engine.round.TrickTakingState;
-
 import java.util.Comparator;
 import java.util.List;
 

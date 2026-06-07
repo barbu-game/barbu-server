@@ -14,7 +14,6 @@ import com.barbu.engine.model.Contract;
 import com.barbu.engine.round.RoundResult;
 import jakarta.inject.Singleton;
 import jakarta.transaction.Transactional;
-
 import java.time.Instant;
 import java.util.List;
 
@@ -29,29 +28,30 @@ public class MatchRecorder {
     private final RoundRepository rounds;
     private final RoundScoreRepository roundScores;
 
-    public MatchRecorder(GameRepository games, GamePlayerRepository gamePlayers,
-                         RoundRepository rounds, RoundScoreRepository roundScores) {
+    public MatchRecorder(
+            GameRepository games,
+            GamePlayerRepository gamePlayers,
+            RoundRepository rounds,
+            RoundScoreRepository roundScores) {
         this.games = games;
         this.gamePlayers = gamePlayers;
         this.rounds = rounds;
         this.roundScores = roundScores;
     }
 
-    public record PlayerInfo(int seat, String displayName, boolean isBot, Long userId) {
-    }
+    public record PlayerInfo(int seat, String displayName, boolean isBot, Long userId) {}
 
     @Transactional
     public long record(String mode, MatchState match, List<PlayerInfo> players) {
-        GameEntity game = games.save(new GameEntity(
-                null, mode, match.playerCount(), RULESET_VERSION, match.seed(), Instant.now()));
+        GameEntity game = games.save(
+                new GameEntity(null, mode, match.playerCount(), RULESET_VERSION, match.seed(), Instant.now()));
         long gameId = game.id();
 
         List<Integer> standings = MatchEngine.standings(match);
         for (PlayerInfo p : players) {
             int rank = standings.indexOf(p.seat()) + 1;
             gamePlayers.save(new GamePlayerEntity(
-                    null, gameId, p.seat(), p.userId(), p.displayName(),
-                    p.isBot(), rank, match.totals()[p.seat()]));
+                    null, gameId, p.seat(), p.userId(), p.displayName(), p.isBot(), rank, match.totals()[p.seat()]));
         }
 
         List<RoundResult> history = match.history();

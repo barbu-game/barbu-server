@@ -2,18 +2,13 @@ package com.barbu.engine.round;
 
 import com.barbu.engine.card.Card;
 import com.barbu.engine.model.Contract;
-
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
 public record MontanteState(
-        List<List<Card>> hands,
-        MontanteBoard board,
-        List<Integer> finishingOrder,
-        int passStreak,
-        int currentPlayer
-) implements RoundState {
+        List<List<Card>> hands, MontanteBoard board, List<Integer> finishingOrder, int passStreak, int currentPlayer)
+        implements RoundState {
 
     public MontanteState {
         hands = TrickTakingState.deepCopy(hands);
@@ -51,7 +46,8 @@ public record MontanteState(
                 rest.add(seat);
             }
         }
-        rest.sort(Comparator.comparingInt((Integer seat) -> hands.get(seat).size()).thenComparingInt(seat -> seat));
+        rest.sort(Comparator.comparingInt((Integer seat) -> hands.get(seat).size())
+                .thenComparingInt(seat -> seat));
         ranking.addAll(rest);
         return List.copyOf(ranking);
     }

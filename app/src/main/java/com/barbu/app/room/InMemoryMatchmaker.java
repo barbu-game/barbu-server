@@ -3,7 +3,6 @@ package com.barbu.app.room;
 import io.micronaut.websocket.WebSocketSession;
 import jakarta.annotation.PreDestroy;
 import jakarta.inject.Singleton;
-
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -33,8 +32,7 @@ public class InMemoryMatchmaker {
         this.rooms = rooms;
     }
 
-    private record Waiting(WebSocketSession session, String name) {
-    }
+    private record Waiting(WebSocketSession session, String name) {}
 
     public synchronized void enqueue(WebSocketSession session, String name, int desiredSize) {
         int size = Math.clamp(desiredSize, 2, 10);
@@ -60,8 +58,8 @@ public class InMemoryMatchmaker {
     }
 
     private void scheduleFill(int size) {
-        timeouts.computeIfAbsent(size, s ->
-                scheduler.schedule(() -> fillWithBots(s), FILL_TIMEOUT_MS, TimeUnit.MILLISECONDS));
+        timeouts.computeIfAbsent(
+                size, s -> scheduler.schedule(() -> fillWithBots(s), FILL_TIMEOUT_MS, TimeUnit.MILLISECONDS));
     }
 
     private synchronized void fillWithBots(int size) {

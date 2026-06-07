@@ -5,14 +5,12 @@ import com.barbu.engine.card.Rank;
 import com.barbu.engine.card.Suit;
 import com.barbu.engine.model.Move;
 import com.barbu.engine.round.MontanteBoard;
-
 import java.util.LinkedHashMap;
 import java.util.Map;
 
 /** Translates engine value types to and from the JSON wire shapes used by clients. */
 public final class Codec {
-    private Codec() {
-    }
+    private Codec() {}
 
     public static Map<String, Object> cardToMap(Card card) {
         Map<String, Object> map = new LinkedHashMap<>();

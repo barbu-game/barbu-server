@@ -1,7 +1,6 @@
 package com.barbu.engine.round;
 
 import com.barbu.engine.model.Contract;
-
 import java.util.Map;
 
 public record RoundResult(Contract contract, int[] points) {
