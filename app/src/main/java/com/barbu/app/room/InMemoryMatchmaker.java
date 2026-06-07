@@ -37,7 +37,7 @@ public class InMemoryMatchmaker {
     }
 
     public synchronized void enqueue(WebSocketSession session, String name, int desiredSize) {
-        int size = Math.max(2, Math.min(10, desiredSize));
+        int size = Math.clamp(desiredSize, 2, 10);
         session.put("mmSize", size);
         queues.computeIfAbsent(size, k -> new ArrayDeque<>()).add(new Waiting(session, name));
 

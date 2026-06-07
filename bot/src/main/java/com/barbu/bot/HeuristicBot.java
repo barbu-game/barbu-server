@@ -25,7 +25,7 @@ public final class HeuristicBot implements BotStrategy {
     public Move chooseMove(RoundState state, int seat) {
         List<Move> legal = RoundEngine.legalMoves(state, seat);
         if (legal.size() == 1) {
-            return legal.get(0);
+            return legal.getFirst();
         }
         return switch (state) {
             case TrickTakingState t -> chooseTrickMove(t, legal);
@@ -79,7 +79,7 @@ public final class HeuristicBot implements BotStrategy {
     private Move chooseMontanteMove(List<Move> legal) {
         List<Card> cards = playableCards(legal);
         if (cards.isEmpty()) {
-            return legal.get(0);
+            return legal.getFirst();
         }
         Card extreme = cards.stream()
                 .max(Comparator.comparingInt(c -> Math.abs(c.rank().montanteValue() - 8)))

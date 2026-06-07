@@ -32,7 +32,7 @@ public class RoomManager {
     }
 
     public GameRoom create(int requestedPlayerCount) {
-        int playerCount = Math.max(2, Math.min(10, requestedPlayerCount));
+        int playerCount = Math.clamp(requestedPlayerCount, 2, 10);
         String id = newCode();
         GameRoom room = new GameRoom(id, playerCount, mapper, scheduler, botDelayMs, recorder);
         rooms.put(id, room);
