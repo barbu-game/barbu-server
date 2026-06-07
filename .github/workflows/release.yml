@@ -15,10 +15,10 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '21'
@@ -29,7 +29,7 @@ jobs:
 
       - name: Compute version
         id: version
-        uses: paulhatch/semantic-version@v5.4.0
+        uses: paulhatch/semantic-version@v6.0.2
         with:
           tag_prefix: v
           version_format: "${major}.${minor}.${patch}"
@@ -42,7 +42,7 @@ jobs:
         run: echo "path=$(find app/build -name 'barbu-api-*.yml' | head -1)" >> "$GITHUB_OUTPUT"
 
       - name: Tag release with the spec as an asset
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: v${{ steps.version.outputs.version }}
           files: ${{ steps.spec.outputs.path }}
@@ -51,7 +51,7 @@ jobs:
         run: cp "${{ steps.spec.outputs.path }}" openapi.yml
 
       - name: Upload the spec for the publish job
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: openapi-spec
           path: openapi.yml
