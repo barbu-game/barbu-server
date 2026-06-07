@@ -1,0 +1,3 @@
+# Mass reformats to skip in `git blame` (git config blame.ignoreRevsFile, honored by GitHub).
+# style: apply palantir-java-format across the codebase
+a86a454d50a1d97bdc5fb58747605387b32555eb
