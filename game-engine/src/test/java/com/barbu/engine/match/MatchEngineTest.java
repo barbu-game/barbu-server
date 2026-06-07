@@ -37,6 +37,17 @@ class MatchEngineTest {
     }
 
     @Test
+    void contracts_are_imposed_in_a_fixed_order_per_dealer() {
+        MatchState m = MatchEngine.newMatch(3, 1L);
+        for (Contract expected : Contract.values()) {
+            assertEquals(expected, MatchEngine.nextContract(m));
+            m = MatchEngine.playOut(MatchEngine.startNextContract(m));
+        }
+        // dealer has rotated; the imposed sequence restarts at the first contract
+        assertEquals(Contract.values()[0], MatchEngine.nextContract(m));
+    }
+
+    @Test
     void dealer_rotates_after_five_contracts_and_marks_boundary() {
         MatchState m = MatchEngine.newMatch(3, 1L);
         for (Contract contract : Contract.values()) {

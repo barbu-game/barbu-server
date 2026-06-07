@@ -6,7 +6,6 @@ import com.barbu.app.protocol.Codec;
 import com.barbu.app.room.GameRoom;
 import com.barbu.app.room.InMemoryMatchmaker;
 import com.barbu.app.room.RoomManager;
-import com.barbu.engine.model.Contract;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micronaut.security.annotation.Secured;
 import io.micronaut.security.rules.SecurityRule;
@@ -110,8 +109,6 @@ public class GameWebSocket {
                     sendError(session, "cannot start (seats must all be filled)");
                 }
             });
-            case "chooseContract" -> withRoomSeat(session, (room, seat) ->
-                    room.chooseContract(seat, Contract.valueOf(asString(command.get("contract")))));
             case "play" -> withRoomSeat(session, (room, seat) ->
                     room.play(seat, Codec.parseMove((Map<String, Object>) command.get("move"))));
             case "castStopVote" -> withRoomSeat(session, (room, seat) ->

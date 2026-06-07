@@ -7,10 +7,10 @@ import com.barbu.bot.HeuristicBot;
 import com.barbu.engine.card.Card;
 import com.barbu.engine.match.MatchEngine;
 import com.barbu.engine.match.MatchState;
-import com.barbu.engine.model.Contract;
 import com.barbu.engine.model.Move;
 import com.barbu.engine.round.MontanteState;
 import com.barbu.engine.round.RoundEngine;
+import com.barbu.engine.round.RoundResult;
 import com.barbu.engine.round.RoundState;
 import com.barbu.engine.round.Trick;
 import com.barbu.engine.round.TrickTakingRules;
@@ -19,6 +19,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micronaut.websocket.WebSocketSession;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -104,16 +105,8 @@ public final class GameRoom {
         }
         match = MatchEngine.newMatch(playerCount, seed);
         broadcast();
-        scheduleBotsIfNeeded();
+        resume();
         return true;
-    }
-
-    public synchronized void chooseContract(int seat, Contract contract) {
-        if (voteOpen || match == null || match.round() != null || seat != match.dealer() || isBot[seat]) {
-            return;
-        }
-        match = MatchEngine.chooseContract(match, contract);
-        afterAdvance();
     }
 
     public synchronized void play(int seat, Move move) {
@@ -165,11 +158,33 @@ public final class GameRoom {
     }
 
     private boolean currentActorIsBot() {
-        if (stopped || voteOpen || trickResolving || match == null || MatchEngine.isComplete(match)) {
+        if (stopped || voteOpen || trickResolving || match == null
+                || MatchEngine.isComplete(match) || match.round() == null) {
             return false;
         }
-        int actor = match.round() == null ? match.dealer() : match.round().currentPlayer();
-        return isBot[actor];
+        return isBot[match.round().currentPlayer()];
+    }
+
+    /** Drive the table forward: open the next imposed contract, or let a waiting bot act. */
+    private void resume() {
+        if (stopped || voteOpen || match == null || MatchEngine.isComplete(match)) {
+            return;
+        }
+        if (match.round() == null) {
+            // Pause on an empty table so the round-switch recap can be shown before the next deal.
+            scheduler.schedule(this::startContractStep, roundSwitchPauseMs(), TimeUnit.MILLISECONDS);
+        } else {
+            scheduleBotsIfNeeded();
+        }
+    }
+
+    private synchronized void startContractStep() {
+        if (stopped || voteOpen || match == null || match.round() != null || MatchEngine.isComplete(match)) {
+            return;
+        }
+        match = MatchEngine.startNextContract(match);
+        broadcast();
+        scheduleBotsIfNeeded();
     }
 
     private void afterAdvance() {
@@ -184,11 +199,7 @@ public final class GameRoom {
             scheduler.schedule(this::releaseTrick, trickPauseMs(), TimeUnit.MILLISECONDS);
         } else {
             broadcast();
-            if (isVotableBoundary()) {
-                openVote();
-            } else {
-                scheduleBotsIfNeeded();
-            }
+            resume();
         }
     }
 
@@ -211,7 +222,7 @@ public final class GameRoom {
         if (isVotableBoundary()) {
             openVote();
         } else {
-            scheduleBotsIfNeeded();
+            resume();
         }
     }
 
@@ -231,6 +242,10 @@ public final class GameRoom {
 
     private long roundEndPauseMs() {
         return botDelayMs == 0 ? 0 : 2500;
+    }
+
+    private long roundSwitchPauseMs() {
+        return botDelayMs == 0 ? 0 : 3500;
     }
 
     private boolean isVotableBoundary() {
@@ -292,7 +307,7 @@ public final class GameRoom {
             broadcast();
         } else {
             broadcast();
-            scheduleBotsIfNeeded();
+            resume();
         }
     }
 
@@ -306,12 +321,8 @@ public final class GameRoom {
         if (!currentActorIsBot()) {
             return;
         }
-        if (match.round() == null) {
-            match = MatchEngine.chooseContract(match, bot.chooseContract(match));
-        } else {
-            int seat = match.round().currentPlayer();
-            match = MatchEngine.applyMoveNoSettle(match, seat, bot.chooseMove(match.round(), seat));
-        }
+        int seat = match.round().currentPlayer();
+        match = MatchEngine.applyMoveNoSettle(match, seat, bot.chooseMove(match.round(), seat));
         afterAdvance();
     }
 
@@ -399,8 +410,9 @@ public final class GameRoom {
         RoundState round = match.round();
         if (round == null) {
             view.put("currentActor", match.dealer());
-            if (seat == match.dealer() && !voteOpen) {
-                view.put("availableContracts", availableContracts());
+            view.put("nextContract", MatchEngine.nextContract(match).name());
+            if (!match.history().isEmpty()) {
+                view.put("lastRound", lastRoundView());
             }
             return view;
         }
@@ -457,14 +469,33 @@ public final class GameRoom {
         return players;
     }
 
-    private List<String> availableContracts() {
-        List<String> contracts = new ArrayList<>();
-        for (Contract contract : Contract.values()) {
-            if (!match.playedByDealer().contains(contract)) {
-                contracts.add(contract.name());
-            }
+    /** Recap of the just-finished round: who scored what, ranked on that round alone. */
+    private Map<String, Object> lastRoundView() {
+        List<RoundResult> history = match.history();
+        RoundResult last = history.get(history.size() - 1);
+        int[] points = last.points();
+
+        List<Integer> order = new ArrayList<>();
+        for (int s = 0; s < playerCount; s++) {
+            order.add(s);
         }
-        return contracts;
+        order.sort(Comparator.comparingInt((Integer s) -> points[s]).reversed());
+
+        List<Map<String, Object>> ranking = new ArrayList<>();
+        for (int rank = 0; rank < order.size(); rank++) {
+            int s = order.get(rank);
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("rank", rank + 1);
+            row.put("seat", s);
+            row.put("name", names[s]);
+            row.put("points", points[s]);
+            ranking.add(row);
+        }
+
+        Map<String, Object> recap = new LinkedHashMap<>();
+        recap.put("contract", last.contract().name());
+        recap.put("ranking", ranking);
+        return recap;
     }
 
     private List<Map<String, Object>> standings() {

@@ -40,6 +40,21 @@ public final class MatchEngine {
         return m.round() == null && m.roundNumber() > 0 && m.playedByDealer().isEmpty() && !isComplete(m);
     }
 
+    /** The contract the current dealer must play next — order is imposed, not chosen. */
+    public static Contract nextContract(MatchState m) {
+        for (Contract contract : Contract.values()) {
+            if (!m.playedByDealer().contains(contract)) {
+                return contract;
+            }
+        }
+        throw new IllegalStateException("dealer has already played every contract");
+    }
+
+    /** Deal and open the next imposed contract for the current dealer. */
+    public static MatchState startNextContract(MatchState m) {
+        return chooseContract(m, nextContract(m));
+    }
+
     public static MatchState chooseContract(MatchState m, Contract contract) {
         if (m.round() != null) {
             throw new IllegalStateException("a round is already in progress");
