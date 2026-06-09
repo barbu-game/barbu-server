@@ -46,6 +46,18 @@ public class RoomManager {
         rooms.remove(id);
     }
 
+    public int activeRoomCount() {
+        return rooms.size();
+    }
+
+    public int activeHumanCount() {
+        return rooms.values().stream().mapToInt(GameRoom::connectedHumanCount).sum();
+    }
+
+    public int activeBotCount() {
+        return rooms.values().stream().mapToInt(GameRoom::botCount).sum();
+    }
+
     public long newSeed() {
         return random.nextLong();
     }

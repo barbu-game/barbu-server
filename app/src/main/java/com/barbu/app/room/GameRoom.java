@@ -78,6 +78,26 @@ public final class GameRoom {
         return id;
     }
 
+    public synchronized int connectedHumanCount() {
+        int n = 0;
+        for (int seat = 0; seat < playerCount; seat++) {
+            if (!isBot[seat] && sessions[seat] != null) {
+                n++;
+            }
+        }
+        return n;
+    }
+
+    public synchronized int botCount() {
+        int n = 0;
+        for (int seat = 0; seat < playerCount; seat++) {
+            if (isBot[seat]) {
+                n++;
+            }
+        }
+        return n;
+    }
+
     public synchronized int addHuman(WebSocketSession session, String name, Long userId) {
         int seat = firstFreeSeat();
         if (seat < 0) {
