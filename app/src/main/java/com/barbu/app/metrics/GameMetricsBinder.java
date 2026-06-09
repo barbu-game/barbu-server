@@ -1,5 +1,6 @@
 package com.barbu.app.metrics;
 
+import com.barbu.app.room.InMemoryMatchmaker;
 import com.barbu.app.room.RoomManager;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -15,10 +16,12 @@ public class GameMetricsBinder {
 
     private final MeterRegistry registry;
     private final RoomManager rooms;
+    private final InMemoryMatchmaker matchmaker;
 
-    public GameMetricsBinder(MeterRegistry registry, RoomManager rooms) {
+    public GameMetricsBinder(MeterRegistry registry, RoomManager rooms, InMemoryMatchmaker matchmaker) {
         this.registry = registry;
         this.rooms = rooms;
+        this.matchmaker = matchmaker;
     }
 
     @PostConstruct
@@ -31,6 +34,9 @@ public class GameMetricsBinder {
                 .register(registry);
         Gauge.builder("barbu.bots.active", rooms, RoomManager::activeBotCount)
                 .description("Bot players seated in rooms")
+                .register(registry);
+        Gauge.builder("barbu.matchmaking.queue", matchmaker, InMemoryMatchmaker::queuedCount)
+                .description("Players waiting in the public matchmaking queue")
                 .register(registry);
     }
 }

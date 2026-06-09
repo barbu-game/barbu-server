@@ -32,4 +32,10 @@ class MetricsEndpointTest {
         assertTrue(body.contains("barbu_players_active"), "players gauge should be present");
         assertTrue(body.contains("barbu_bots_active"), "bots gauge should be present");
     }
+
+    @Test
+    void reportsMatchmakingQueueGauge() {
+        String body = client.toBlocking().retrieve("/prometheus");
+        assertTrue(body.contains("barbu_matchmaking_queue"), "matchmaking gauge should be present");
+    }
 }

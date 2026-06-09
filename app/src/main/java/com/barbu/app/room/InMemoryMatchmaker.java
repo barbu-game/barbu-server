@@ -57,6 +57,10 @@ public class InMemoryMatchmaker {
         }
     }
 
+    public synchronized int queuedCount() {
+        return queues.values().stream().mapToInt(java.util.Deque::size).sum();
+    }
+
     private void scheduleFill(int size) {
         timeouts.computeIfAbsent(
                 size, s -> scheduler.schedule(() -> fillWithBots(s), FILL_TIMEOUT_MS, TimeUnit.MILLISECONDS));
