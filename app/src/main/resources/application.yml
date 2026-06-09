@@ -11,12 +11,28 @@ micronaut:
             - http://localhost:3000
   security:
     authentication: bearer
+    intercept-url-map:
+      - pattern: /prometheus
+        access:
+          - isAnonymous()
     token:
       jwt:
         signatures:
           secret:
             generator:
               secret: ${JWT_SECRET}
+  metrics:
+    enabled: true
+    binders:
+      jvm:
+        enabled: true
+      web:
+        enabled: true
+    export:
+      prometheus:
+        enabled: true
+        step: PT1M
+        descriptions: true
 
 # Defaults to an in-memory H2 (PostgreSQL mode) so the server runs with zero setup.
 # Production overrides JDBC_* to point at PostgreSQL.
@@ -38,3 +54,5 @@ flyway:
 endpoints:
   health:
     enabled: false
+  prometheus:
+    sensitive: false
