@@ -38,6 +38,7 @@ public final class GameRoom {
     private final ScheduledExecutorService scheduler;
     private final long botDelayMs;
     private final MatchRecorder recorder;
+    private final com.barbu.app.metrics.GameMetrics metrics;
     private final BotStrategy bot = new HeuristicBot();
 
     private static final long VOTE_TIMEOUT_MS = 15000;
@@ -61,13 +62,15 @@ public final class GameRoom {
             ObjectMapper mapper,
             ScheduledExecutorService scheduler,
             long botDelayMs,
-            MatchRecorder recorder) {
+            MatchRecorder recorder,
+            com.barbu.app.metrics.GameMetrics metrics) {
         this.id = id;
         this.playerCount = playerCount;
         this.mapper = mapper;
         this.scheduler = scheduler;
         this.botDelayMs = botDelayMs;
         this.recorder = recorder;
+        this.metrics = metrics;
         this.names = new String[playerCount];
         this.isBot = new boolean[playerCount];
         this.userIds = new Long[playerCount];
@@ -128,6 +131,9 @@ public final class GameRoom {
             return false;
         }
         match = MatchEngine.newMatch(playerCount, seed);
+        if (metrics != null) {
+            metrics.gameStarted();
+        }
         broadcast();
         resume();
         return true;
@@ -401,6 +407,9 @@ public final class GameRoom {
             return;
         }
         recorded = true;
+        if (metrics != null) {
+            metrics.gameFinished();
+        }
         List<MatchRecorder.PlayerInfo> players = new ArrayList<>(playerCount);
         for (int seat = 0; seat < playerCount; seat++) {
             players.add(new MatchRecorder.PlayerInfo(seat, names[seat], isBot[seat], userIds[seat]));

@@ -38,4 +38,15 @@ class MetricsEndpointTest {
         String body = client.toBlocking().retrieve("/prometheus");
         assertTrue(body.contains("barbu_matchmaking_queue"), "matchmaking gauge should be present");
     }
+
+    @Test
+    void countsStartedGames() {
+        com.barbu.app.room.GameRoom room = rooms.create(2);
+        room.addBot();
+        room.addBot();
+        room.start(42L);
+        String body = client.toBlocking().retrieve("/prometheus");
+        assertTrue(body.contains("barbu_games_started_total"), "started counter should be present");
+        assertTrue(body.contains("barbu_games_finished_total"), "finished counter should be present");
+    }
 }

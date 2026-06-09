@@ -19,21 +19,26 @@ public class RoomManager {
     private final Map<String, GameRoom> rooms = new ConcurrentHashMap<>();
     private final ObjectMapper mapper;
     private final MatchRecorder recorder;
+    private final com.barbu.app.metrics.GameMetrics metrics;
     private final long botDelayMs;
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
     private final Random random = new Random();
 
     public RoomManager(
-            ObjectMapper mapper, MatchRecorder recorder, @Value("${barbu.bot-delay-ms:650}") long botDelayMs) {
+            ObjectMapper mapper,
+            MatchRecorder recorder,
+            com.barbu.app.metrics.GameMetrics metrics,
+            @Value("${barbu.bot-delay-ms:650}") long botDelayMs) {
         this.mapper = mapper;
         this.recorder = recorder;
+        this.metrics = metrics;
         this.botDelayMs = botDelayMs;
     }
 
     public GameRoom create(int requestedPlayerCount) {
         int playerCount = Math.clamp(requestedPlayerCount, 2, 10);
         String id = newCode();
-        GameRoom room = new GameRoom(id, playerCount, mapper, scheduler, botDelayMs, recorder);
+        GameRoom room = new GameRoom(id, playerCount, mapper, scheduler, botDelayMs, recorder, metrics);
         rooms.put(id, room);
         return room;
     }
