@@ -2,7 +2,6 @@ package com.barbu.bot;
 
 import com.barbu.engine.card.Card;
 import com.barbu.engine.card.Suit;
-import com.barbu.engine.match.MatchState;
 import com.barbu.engine.model.Contract;
 import com.barbu.engine.model.Move;
 import com.barbu.engine.round.MontanteState;
@@ -30,16 +29,6 @@ public final class HeuristicBot implements BotStrategy {
             case TrickTakingState t -> chooseTrickMove(t, legal);
             case MontanteState m -> chooseMontanteMove(legal);
         };
-    }
-
-    @Override
-    public Contract chooseContract(MatchState state) {
-        for (Contract contract : Contract.values()) {
-            if (!state.playedByDealer().contains(contract)) {
-                return contract;
-            }
-        }
-        throw new IllegalStateException("dealer has already played every contract");
     }
 
     private Move chooseTrickMove(TrickTakingState state, List<Move> legal) {
@@ -101,7 +90,9 @@ public final class HeuristicBot implements BotStrategy {
             case NO_HEARTS -> card.isHeart() ? 1 : 0;
             case NO_QUEENS -> card.isQueen() ? 1 : 0;
             case NO_RED_KINGS -> card.isRedKing() ? 1 : 0;
-            case NO_TRICKS, MONTANTE -> 0;
+            case NO_KING_OF_HEARTS -> card.isKingOfHearts() ? 1 : 0;
+            case NO_JACKS -> card.isJack() ? 1 : 0;
+            default -> 0;
         };
     }
 

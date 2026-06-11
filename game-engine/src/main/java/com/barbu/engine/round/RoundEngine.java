@@ -16,7 +16,7 @@ public final class RoundEngine {
         for (int i = 0; i < hands.size(); i++) {
             empty.add(List.of());
         }
-        return new TrickTakingState(contract, hands, Trick.startedBy(leader, hands.size()), empty, leader);
+        return new TrickTakingState(contract, hands, Trick.startedBy(leader, hands.size()), empty, List.of(), leader);
     }
 
     public static RoundState startMontante(List<List<Card>> hands, int eightOfDiamondsHolder) {
@@ -40,13 +40,6 @@ public final class RoundEngine {
     /** Clear a displayed, finished trick so its taker can lead the next one (trick-taking only). */
     public static RoundState collectTrick(RoundState state) {
         return state instanceof TrickTakingState t ? TrickTakingRules.collectTrick(t) : state;
-    }
-
-    public static RoundResult score(RoundState state) {
-        return switch (state) {
-            case TrickTakingState t -> RoundResult.fromMap(t.contract(), TrickTakingRules.score(t));
-            case MontanteState m -> RoundResult.fromMap(m.contract(), MontanteRules.score(m));
-        };
     }
 
     public static int eightOfDiamondsHolder(List<List<Card>> hands) {

@@ -6,9 +6,16 @@ import com.barbu.engine.model.Contract;
 import com.barbu.engine.model.ContractType;
 import com.barbu.engine.model.Move;
 import com.barbu.engine.model.Seats;
+import com.barbu.engine.round.MontanteRules;
+import com.barbu.engine.round.MontanteState;
 import com.barbu.engine.round.RoundEngine;
 import com.barbu.engine.round.RoundResult;
 import com.barbu.engine.round.RoundState;
+import com.barbu.engine.round.TrickTakingState;
+import com.barbu.engine.scoring.TrickOutcome;
+import com.barbu.engine.scoring.TrickScoringRule;
+import com.barbu.engine.variant.Variant;
+import com.barbu.engine.variant.Variants;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumSet;
@@ -19,10 +26,18 @@ public final class MatchEngine {
     private MatchEngine() {}
 
     public static MatchState newMatch(int playerCount, long seed) {
-        return newMatch(playerCount, seed, Contract.values().length * playerCount);
+        return newMatch(playerCount, seed, Variants.DEVELOPER);
+    }
+
+    public static MatchState newMatch(int playerCount, long seed, Variant variant) {
+        return newMatch(playerCount, seed, variant, variant.contracts().size() * playerCount);
     }
 
     public static MatchState newMatch(int playerCount, long seed, int plannedRounds) {
+        return newMatch(playerCount, seed, Variants.DEVELOPER, plannedRounds);
+    }
+
+    public static MatchState newMatch(int playerCount, long seed, Variant variant, int plannedRounds) {
         if (playerCount < Seats.MIN || playerCount > Seats.MAX) {
             throw new IllegalArgumentException("playerCount out of range: " + playerCount);
         }
@@ -35,7 +50,8 @@ public final class MatchEngine {
                 EnumSet.noneOf(Contract.class),
                 null,
                 new int[playerCount],
-                List.of());
+                List.of(),
+                variant);
     }
 
     public static boolean isComplete(MatchState m) {
@@ -46,9 +62,9 @@ public final class MatchEngine {
         return m.round() == null && m.roundNumber() > 0 && m.playedByDealer().isEmpty() && !isComplete(m);
     }
 
-    /** The contract the current dealer must play next — order is imposed, not chosen. */
+    /** The contract the current dealer must play next — order is imposed by the variant. */
     public static Contract nextContract(MatchState m) {
-        for (Contract contract : Contract.values()) {
+        for (Contract contract : m.variant().contracts()) {
             if (!m.playedByDealer().contains(contract)) {
                 return contract;
             }
@@ -85,7 +101,8 @@ public final class MatchEngine {
                 m.playedByDealer(),
                 round,
                 m.totals(),
-                m.history());
+                m.history(),
+                m.variant());
     }
 
     public static MatchState applyMove(MatchState m, int seat, Move move) {
@@ -103,7 +120,8 @@ public final class MatchEngine {
                     m.playedByDealer(),
                     round,
                     m.totals(),
-                    m.history());
+                    m.history(),
+                    m.variant());
         }
         return settleRound(m, round);
     }
@@ -123,7 +141,8 @@ public final class MatchEngine {
                 m.playedByDealer(),
                 round,
                 m.totals(),
-                m.history());
+                m.history(),
+                m.variant());
     }
 
     /** Clear a displayed, finished trick so its taker can lead the next one. */
@@ -141,7 +160,8 @@ public final class MatchEngine {
                 m.playedByDealer(),
                 round,
                 m.totals(),
-                m.history());
+                m.history(),
+                m.variant());
     }
 
     /** Score and close the current round if it is complete; otherwise a no-op. */
@@ -171,8 +191,22 @@ public final class MatchEngine {
         return List.copyOf(seats);
     }
 
+    /** Score one finished round with the active variant's rule (trick) or the montante ranking. */
+    public static RoundResult scoreRound(Variant variant, RoundState round) {
+        if (round instanceof MontanteState ms) {
+            return RoundResult.fromMap(Contract.MONTANTE, MontanteRules.score(ms));
+        }
+        TrickTakingState ts = (TrickTakingState) round;
+        TrickScoringRule rule = variant.trickRules().get(ts.contract());
+        if (rule == null) {
+            throw new IllegalStateException("variant " + variant.id() + " has no rule for " + ts.contract());
+        }
+        int[] points = rule.score(new TrickOutcome(ts.captured(), ts.trickTakers(), ts.playerCount()));
+        return new RoundResult(ts.contract(), points);
+    }
+
     private static MatchState settleRound(MatchState m, RoundState completedRound) {
-        RoundResult result = RoundEngine.score(completedRound);
+        RoundResult result = scoreRound(m.variant(), completedRound);
 
         int[] totals = m.totals().clone();
         for (int seat = 0; seat < m.playerCount(); seat++) {
@@ -186,7 +220,7 @@ public final class MatchEngine {
         playedByDealer.add(completedRound.contract());
 
         int dealer = m.dealer();
-        if (playedByDealer.size() == Contract.values().length) {
+        if (playedByDealer.size() == m.variant().contracts().size()) {
             dealer = Seats.next(dealer, m.playerCount());
             playedByDealer = EnumSet.noneOf(Contract.class);
         }
@@ -200,7 +234,8 @@ public final class MatchEngine {
                 playedByDealer,
                 null,
                 totals,
-                history);
+                history,
+                m.variant());
     }
 
     private static List<List<Card>> deal(int playerCount, long seed) {

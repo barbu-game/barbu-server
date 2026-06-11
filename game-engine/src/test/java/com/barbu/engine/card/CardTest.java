@@ -24,4 +24,12 @@ class CardTest {
     void value_equality() {
         assertEquals(new Card(Suit.SPADES, Rank.ACE), new Card(Suit.SPADES, Rank.ACE));
     }
+
+    @Test
+    void detects_king_of_hearts_and_jack() {
+        assertTrue(new Card(Suit.HEARTS, Rank.KING).isKingOfHearts());
+        assertFalse(new Card(Suit.DIAMONDS, Rank.KING).isKingOfHearts());
+        assertTrue(new Card(Suit.SPADES, Rank.JACK).isJack());
+        assertFalse(new Card(Suit.SPADES, Rank.QUEEN).isJack());
+    }
 }

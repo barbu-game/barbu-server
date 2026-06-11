@@ -68,3 +68,16 @@ jobs:
     with:
       version: ${{ needs.release.outputs.version }}
     secrets: inherit
+
+  build-image:
+    needs: release
+    permissions:
+      contents: read
+      packages: write
+    uses: barbu-game/barbu-actions/.github/workflows/build-push-image.yml@main
+    with:
+      image: barbu-server
+      version: ${{ needs.release.outputs.version }}
+      context: .
+      dockerfile: app/Dockerfile
+    secrets: inherit

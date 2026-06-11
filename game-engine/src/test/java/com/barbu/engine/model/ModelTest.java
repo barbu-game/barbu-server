@@ -22,7 +22,7 @@ class ModelTest {
         assertEquals(ContractType.MONTANTE, Contract.MONTANTE.type());
         assertEquals(ContractType.TRICK_TAKING, Contract.NO_TRICKS.type());
         assertEquals(ContractType.TRICK_TAKING, Contract.NO_RED_KINGS.type());
-        assertEquals(5, Contract.values().length);
+        assertEquals(9, Contract.values().length);
     }
 
     @Test

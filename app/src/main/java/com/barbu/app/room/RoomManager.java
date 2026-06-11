@@ -1,6 +1,7 @@
 package com.barbu.app.room;
 
 import com.barbu.app.persistence.MatchRecorder;
+import com.barbu.engine.variant.Variant;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micronaut.context.annotation.Value;
 import jakarta.annotation.PreDestroy;
@@ -35,10 +36,10 @@ public class RoomManager {
         this.botDelayMs = botDelayMs;
     }
 
-    public GameRoom create(int requestedPlayerCount) {
+    public GameRoom create(int requestedPlayerCount, Variant variant) {
         int playerCount = Math.clamp(requestedPlayerCount, 2, 10);
         String id = newCode();
-        GameRoom room = new GameRoom(id, playerCount, mapper, scheduler, botDelayMs, recorder, metrics);
+        GameRoom room = new GameRoom(id, playerCount, variant, mapper, scheduler, botDelayMs, recorder, metrics);
         rooms.put(id, room);
         return room;
     }

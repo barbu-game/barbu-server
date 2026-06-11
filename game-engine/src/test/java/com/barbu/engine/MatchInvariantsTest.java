@@ -4,7 +4,6 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import com.barbu.engine.match.MatchEngine;
 import com.barbu.engine.match.MatchState;
-import com.barbu.engine.model.Contract;
 import net.jqwik.api.ForAll;
 import net.jqwik.api.Property;
 import net.jqwik.api.constraints.IntRange;
@@ -15,18 +14,9 @@ class MatchInvariantsTest {
     private static MatchState playFull(int n, long seed) {
         MatchState m = MatchEngine.newMatch(n, seed);
         while (!MatchEngine.isComplete(m)) {
-            m = MatchEngine.playOut(MatchEngine.chooseContract(m, nextUnplayed(m)));
+            m = MatchEngine.playOut(MatchEngine.startNextContract(m));
         }
         return m;
-    }
-
-    private static Contract nextUnplayed(MatchState m) {
-        for (Contract contract : Contract.values()) {
-            if (!m.playedByDealer().contains(contract)) {
-                return contract;
-            }
-        }
-        throw new IllegalStateException();
     }
 
     @Property

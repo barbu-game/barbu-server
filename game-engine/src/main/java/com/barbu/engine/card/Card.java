@@ -16,4 +16,12 @@ public record Card(Suit suit, Rank rank) {
     public boolean isRedKing() {
         return rank == Rank.KING && suit.isRed();
     }
+
+    public boolean isKingOfHearts() {
+        return rank == Rank.KING && suit == Suit.HEARTS;
+    }
+
+    public boolean isJack() {
+        return rank == Rank.JACK;
+    }
 }

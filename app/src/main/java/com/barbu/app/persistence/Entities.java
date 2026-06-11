@@ -20,6 +20,7 @@ public final class Entities {
             int playerCount,
             String rulesetVersion,
             long seed,
+            String variant,
             Instant createdAt) {}
 
     @MappedEntity("game_players")

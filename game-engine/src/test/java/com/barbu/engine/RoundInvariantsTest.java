@@ -4,9 +4,11 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import com.barbu.engine.card.Card;
 import com.barbu.engine.card.Deck;
+import com.barbu.engine.match.MatchEngine;
 import com.barbu.engine.model.Contract;
 import com.barbu.engine.round.RoundEngine;
 import com.barbu.engine.round.RoundState;
+import com.barbu.engine.variant.Variants;
 import java.util.ArrayList;
 import java.util.List;
 import net.jqwik.api.ForAll;
@@ -50,7 +52,7 @@ class RoundInvariantsTest {
                     RoundEngine.legalMoves(s, s.currentPlayer()).get(0));
         }
         int total = 0;
-        for (int p : RoundEngine.score(s).points()) {
+        for (int p : MatchEngine.scoreRound(Variants.DEVELOPER, s).points()) {
             total += p;
         }
         assertEquals(-2 * tricks, total, "n=" + n + " seed=" + seed);
@@ -70,7 +72,7 @@ class RoundInvariantsTest {
             assertTrue(guard++ < 400, "montante did not terminate n=" + n + " seed=" + seed);
         }
         int total = 0;
-        for (int p : RoundEngine.score(s).points()) {
+        for (int p : MatchEngine.scoreRound(Variants.DEVELOPER, s).points()) {
             total += p;
         }
         assertEquals(0, total, "n=" + n + " seed=" + seed);

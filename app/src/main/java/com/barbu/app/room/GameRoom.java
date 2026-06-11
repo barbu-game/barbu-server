@@ -1,6 +1,8 @@
 package com.barbu.app.room;
 
 import com.barbu.app.persistence.MatchRecorder;
+import com.barbu.app.protocol.ChatBroadcast;
+import com.barbu.app.protocol.ChatFilter;
 import com.barbu.app.protocol.Codec;
 import com.barbu.bot.BotStrategy;
 import com.barbu.bot.HeuristicBot;
@@ -13,8 +15,9 @@ import com.barbu.engine.round.RoundEngine;
 import com.barbu.engine.round.RoundResult;
 import com.barbu.engine.round.RoundState;
 import com.barbu.engine.round.Trick;
-import com.barbu.engine.round.TrickTakingRules;
 import com.barbu.engine.round.TrickTakingState;
+import com.barbu.engine.scoring.TrickOutcome;
+import com.barbu.engine.variant.Variant;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micronaut.websocket.WebSocketSession;
 import java.util.ArrayList;
@@ -22,6 +25,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -34,6 +38,7 @@ public final class GameRoom {
 
     private final String id;
     private final int playerCount;
+    private final Variant variant;
     private final ObjectMapper mapper;
     private final ScheduledExecutorService scheduler;
     private final long botDelayMs;
@@ -43,10 +48,15 @@ public final class GameRoom {
 
     private static final long VOTE_TIMEOUT_MS = 15000;
 
+    private static final int MAX_CHAT_LEN = 280;
+    private static final long CHAT_MIN_INTERVAL_MS = 500;
+
     private final String[] names;
     private final boolean[] isBot;
     private final Long[] userIds;
     private final WebSocketSession[] sessions;
+    private final long[] lastChatAt;
+    private final ChatFilter chatFilter = new ChatFilter();
 
     private MatchState match;
     private boolean recorded;
@@ -59,6 +69,7 @@ public final class GameRoom {
     GameRoom(
             String id,
             int playerCount,
+            Variant variant,
             ObjectMapper mapper,
             ScheduledExecutorService scheduler,
             long botDelayMs,
@@ -66,6 +77,7 @@ public final class GameRoom {
             com.barbu.app.metrics.GameMetrics metrics) {
         this.id = id;
         this.playerCount = playerCount;
+        this.variant = variant;
         this.mapper = mapper;
         this.scheduler = scheduler;
         this.botDelayMs = botDelayMs;
@@ -75,6 +87,7 @@ public final class GameRoom {
         this.isBot = new boolean[playerCount];
         this.userIds = new Long[playerCount];
         this.sessions = new WebSocketSession[playerCount];
+        this.lastChatAt = new long[playerCount];
     }
 
     public String id() {
@@ -130,7 +143,7 @@ public final class GameRoom {
         if (match != null || !isFull()) {
             return false;
         }
-        match = MatchEngine.newMatch(playerCount, seed);
+        match = MatchEngine.newMatch(playerCount, seed, variant);
         if (metrics != null) {
             metrics.gameStarted();
         }
@@ -165,8 +178,52 @@ public final class GameRoom {
         }
     }
 
+    /** Un humain attablé écrit dans le tchat de table. Diffusé à tous, jamais persisté. */
+    public synchronized void chat(int seat, String rawText) {
+        if (seat < 0 || seat >= playerCount) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        Optional<ChatBroadcast> message =
+                prepareChat(seat, names[seat], isBot[seat], rawText, now, lastChatAt[seat], chatFilter);
+        if (message.isEmpty()) {
+            return;
+        }
+        lastChatAt[seat] = now;
+        ChatBroadcast m = message.get();
+        broadcastRaw(Map.of(
+                "type", "chat",
+                "seat", m.seat(),
+                "name", m.name(),
+                "text", m.text(),
+                "ts", m.ts()));
+    }
+
     static boolean stopVotePasses(int stopVotes, int humans) {
         return stopVotes * 2 > humans;
+    }
+
+    /**
+     * Décide d'un message de tchat sans aucun effet de bord : renvoie le {@link ChatBroadcast}
+     * à diffuser, ou vide si le message est ignoré (siège bot, texte vide, ou anti-spam).
+     */
+    static Optional<ChatBroadcast> prepareChat(
+            int seat, String name, boolean isBot, String rawText, long now, long lastChatAt, ChatFilter filter) {
+        if (isBot || rawText == null) {
+            return Optional.empty();
+        }
+        String trimmed = rawText.trim();
+        if (trimmed.isEmpty()) {
+            return Optional.empty();
+        }
+        if (now - lastChatAt < CHAT_MIN_INTERVAL_MS) {
+            return Optional.empty();
+        }
+        if (trimmed.length() > MAX_CHAT_LEN) {
+            trimmed = trimmed.substring(0, MAX_CHAT_LEN);
+        }
+        String clean = filter.sanitize(trimmed);
+        return Optional.of(new ChatBroadcast(seat, name, clean, now));
     }
 
     /** A human left: hand their seat to a bot so the table keeps playing (spec §5.5). */
@@ -402,6 +459,21 @@ public final class GameRoom {
         maybeRecord();
     }
 
+    /** Envoie le même payload à toutes les sessions ouvertes (pas de rédaction par siège). */
+    private synchronized void broadcastRaw(Map<String, Object> payload) {
+        for (int seat = 0; seat < playerCount; seat++) {
+            WebSocketSession session = sessions[seat];
+            if (session == null || !session.isOpen()) {
+                continue;
+            }
+            try {
+                session.sendSync(mapper.writeValueAsString(payload));
+            } catch (Exception ignored) {
+                // a dropped client is reconciled on its next snapshot; chat is best-effort
+            }
+        }
+    }
+
     private void maybeRecord() {
         if (recorder == null || recorded || match == null || !(stopped || MatchEngine.isComplete(match))) {
             return;
@@ -429,6 +501,11 @@ public final class GameRoom {
         view.put("yourSeat", seat);
         view.put("phase", phase());
         view.put("players", playersInfo());
+
+        Map<String, Object> variantInfo = new LinkedHashMap<>();
+        variantInfo.put("id", variant.id());
+        variantInfo.put("name", variant.name());
+        view.put("variant", variantInfo);
 
         if (match == null) {
             return view;
@@ -470,10 +547,13 @@ public final class GameRoom {
 
         if (round instanceof TrickTakingState t) {
             view.put("trick", trickView(t.currentTrick()));
-            Map<Integer, Integer> running = TrickTakingRules.runningScores(t);
+            int[] running = match.variant()
+                    .trickRules()
+                    .get(t.contract())
+                    .score(new TrickOutcome(t.captured(), t.trickTakers(), playerCount));
             List<Integer> roundScores = new ArrayList<>();
             for (int s = 0; s < playerCount; s++) {
-                roundScores.add(running.get(s));
+                roundScores.add(running[s]);
             }
             view.put("roundScores", roundScores);
         } else if (round instanceof MontanteState m) {

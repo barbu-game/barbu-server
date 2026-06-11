@@ -38,19 +38,20 @@ class MatchEngineTest {
     @Test
     void contracts_are_imposed_in_a_fixed_order_per_dealer() {
         MatchState m = MatchEngine.newMatch(3, 1L);
-        for (Contract expected : Contract.values()) {
+        List<Contract> seq = m.variant().contracts();
+        for (Contract expected : seq) {
             assertEquals(expected, MatchEngine.nextContract(m));
             m = MatchEngine.playOut(MatchEngine.startNextContract(m));
         }
         // dealer has rotated; the imposed sequence restarts at the first contract
-        assertEquals(Contract.values()[0], MatchEngine.nextContract(m));
+        assertEquals(seq.get(0), MatchEngine.nextContract(m));
     }
 
     @Test
     void dealer_rotates_after_five_contracts_and_marks_boundary() {
         MatchState m = MatchEngine.newMatch(3, 1L);
-        for (Contract contract : Contract.values()) {
-            m = MatchEngine.playOut(MatchEngine.chooseContract(m, contract));
+        for (int i = 0; i < 5; i++) {
+            m = MatchEngine.playOut(MatchEngine.startNextContract(m));
         }
         assertEquals(1, m.dealer());
         assertEquals(5, m.roundNumber());
@@ -62,7 +63,7 @@ class MatchEngineTest {
         MatchState m = MatchEngine.newMatch(4, 7L, 5);
         int rounds = 0;
         while (!MatchEngine.isComplete(m)) {
-            m = MatchEngine.playOut(MatchEngine.chooseContract(m, nextUnplayed(m)));
+            m = MatchEngine.playOut(MatchEngine.startNextContract(m));
             rounds++;
         }
         assertEquals(5, rounds);
@@ -73,7 +74,7 @@ class MatchEngineTest {
         for (int n = 2; n <= 6; n++) {
             MatchState m = MatchEngine.newMatch(n, 2024L);
             while (!MatchEngine.isComplete(m)) {
-                m = MatchEngine.playOut(MatchEngine.chooseContract(m, nextUnplayed(m)));
+                m = MatchEngine.playOut(MatchEngine.startNextContract(m));
             }
             assertEquals(5 * n, m.roundNumber(), "n=" + n);
             List<Integer> standings = MatchEngine.standings(m);
@@ -81,14 +82,5 @@ class MatchEngineTest {
             for (int s = 0; s < n; s++) expected.add(s);
             assertEquals(expected, new HashSet<>(standings), "n=" + n);
         }
-    }
-
-    private static Contract nextUnplayed(MatchState m) {
-        for (Contract contract : Contract.values()) {
-            if (!m.playedByDealer().contains(contract)) {
-                return contract;
-            }
-        }
-        throw new IllegalStateException("all contracts played");
     }
 }

@@ -11,6 +11,9 @@ public final class ScoringConfig {
     public static final int PER_HEART = -2;
     public static final int PER_QUEEN = -6;
     public static final int PER_RED_KING = -10;
+    public static final int PER_KING_OF_HEARTS = -20;
+    public static final int PER_JACK = -2;
+    public static final int PER_LAST_TRICK = -10;
 
     public static final int MONTANTE_STEP = 5;
 

@@ -10,7 +10,6 @@ import com.barbu.app.persistence.Repositories.RoundRepository;
 import com.barbu.app.persistence.Repositories.RoundScoreRepository;
 import com.barbu.engine.match.MatchEngine;
 import com.barbu.engine.match.MatchState;
-import com.barbu.engine.model.Contract;
 import com.barbu.engine.round.RoundResult;
 import jakarta.inject.Singleton;
 import jakarta.transaction.Transactional;
@@ -21,7 +20,6 @@ import java.util.List;
 public class MatchRecorder {
 
     private static final String RULESET_VERSION = "1";
-    private static final int CONTRACTS_PER_DEALER = Contract.values().length;
 
     private final GameRepository games;
     private final GamePlayerRepository gamePlayers;
@@ -43,8 +41,14 @@ public class MatchRecorder {
 
     @Transactional
     public long record(String mode, MatchState match, List<PlayerInfo> players) {
-        GameEntity game = games.save(
-                new GameEntity(null, mode, match.playerCount(), RULESET_VERSION, match.seed(), Instant.now()));
+        GameEntity game = games.save(new GameEntity(
+                null,
+                mode,
+                match.playerCount(),
+                RULESET_VERSION,
+                match.seed(),
+                match.variant().id(),
+                Instant.now()));
         long gameId = game.id();
 
         List<Integer> standings = MatchEngine.standings(match);
@@ -54,10 +58,11 @@ public class MatchRecorder {
                     null, gameId, p.seat(), p.userId(), p.displayName(), p.isBot(), rank, match.totals()[p.seat()]));
         }
 
+        int contractsPerDealer = match.variant().contracts().size();
         List<RoundResult> history = match.history();
         for (int i = 0; i < history.size(); i++) {
             RoundResult result = history.get(i);
-            int dealer = (i / CONTRACTS_PER_DEALER) % match.playerCount();
+            int dealer = (i / contractsPerDealer) % match.playerCount();
             RoundEntity round = rounds.save(new RoundEntity(
                     null, gameId, i + 1, dealer, result.contract().name()));
             long roundId = round.id();

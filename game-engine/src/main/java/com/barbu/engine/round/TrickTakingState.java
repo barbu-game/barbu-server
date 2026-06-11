@@ -6,12 +6,18 @@ import java.util.ArrayList;
 import java.util.List;
 
 public record TrickTakingState(
-        Contract contract, List<List<Card>> hands, Trick currentTrick, List<List<Card>> captured, int currentPlayer)
+        Contract contract,
+        List<List<Card>> hands,
+        Trick currentTrick,
+        List<List<Card>> captured,
+        List<Integer> trickTakers,
+        int currentPlayer)
         implements RoundState {
 
     public TrickTakingState {
         hands = deepCopy(hands);
         captured = deepCopy(captured);
+        trickTakers = List.copyOf(trickTakers);
     }
 
     static List<List<Card>> deepCopy(List<List<Card>> in) {

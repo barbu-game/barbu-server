@@ -1,5 +1,6 @@
 package com.barbu.app.room;
 
+import com.barbu.engine.variant.Variants;
 import io.micronaut.websocket.WebSocketSession;
 import jakarta.annotation.PreDestroy;
 import jakarta.inject.Singleton;
@@ -88,7 +89,7 @@ public class InMemoryMatchmaker {
             pending.cancel(false);
         }
 
-        GameRoom room = rooms.create(size);
+        GameRoom room = rooms.create(size, Variants.DEVELOPER);
         for (Waiting w : taken) {
             String name = w.session().get("username", String.class).orElse(w.name());
             Long userId = w.session().get("userId", Long.class).orElse(null);

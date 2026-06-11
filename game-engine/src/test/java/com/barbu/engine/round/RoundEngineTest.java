@@ -56,7 +56,7 @@ class RoundEngineTest {
                 List.of(2, 0, 3),
                 0,
                 1);
-        RoundResult r = RoundEngine.score(done);
+        RoundResult r = RoundResult.fromMap(Contract.MONTANTE, MontanteRules.score(done));
         assertEquals(15, r.points()[2]);
         assertEquals(-15, r.points()[1]);
     }

@@ -1,0 +1,1 @@
+ALTER TABLE games ADD COLUMN variant VARCHAR(20) NOT NULL DEFAULT 'developer';

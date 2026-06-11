@@ -26,7 +26,7 @@ class MetricsEndpointTest {
 
     @Test
     void reportsActiveRoomsGauge() {
-        rooms.create(4);
+        rooms.create(4, com.barbu.engine.variant.Variants.DEVELOPER);
         String body = client.toBlocking().retrieve("/prometheus");
         assertTrue(body.contains("barbu_rooms_active"), "rooms gauge should be present");
         assertTrue(body.contains("barbu_players_active"), "players gauge should be present");
@@ -41,7 +41,7 @@ class MetricsEndpointTest {
 
     @Test
     void countsStartedGames() {
-        com.barbu.app.room.GameRoom room = rooms.create(2);
+        com.barbu.app.room.GameRoom room = rooms.create(2, com.barbu.engine.variant.Variants.DEVELOPER);
         room.addBot();
         room.addBot();
         room.start(42L);

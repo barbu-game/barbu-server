@@ -32,7 +32,7 @@ class HeuristicBotTest {
             @ForAll @IntRange(min = 2, max = 10) int n, @ForAll @LongRange(min = 0, max = 150) long seed) {
         MatchState m = MatchEngine.newMatch(n, seed);
         while (!MatchEngine.isComplete(m)) {
-            m = MatchEngine.chooseContract(m, bot.chooseContract(m));
+            m = MatchEngine.startNextContract(m);
             while (m.round() != null) {
                 RoundState round = m.round();
                 int seat = round.currentPlayer();
@@ -58,6 +58,7 @@ class HeuristicBotTest {
                 hands,
                 Trick.startedBy(0, 4).withCard(c(Suit.SPADES, Rank.ACE)),
                 List.of(List.of(), List.of(), List.of(), List.of()),
+                List.of(),
                 1);
 
         Move move = bot.chooseMove(s, 1);
@@ -76,6 +77,7 @@ class HeuristicBotTest {
                 hands,
                 Trick.startedBy(0, 4).withCard(c(Suit.SPADES, Rank.TEN)),
                 List.of(List.of(), List.of(), List.of(), List.of()),
+                List.of(),
                 1);
 
         Move move = bot.chooseMove(s, 1);

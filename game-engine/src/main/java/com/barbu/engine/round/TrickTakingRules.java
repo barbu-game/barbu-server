@@ -2,14 +2,10 @@ package com.barbu.engine.round;
 
 import com.barbu.engine.card.Card;
 import com.barbu.engine.card.Suit;
-import com.barbu.engine.model.Contract;
 import com.barbu.engine.model.Move;
-import com.barbu.engine.model.ScoringConfig;
 import com.barbu.engine.model.Seats;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 public final class TrickTakingRules {
     private TrickTakingRules() {}
@@ -65,10 +61,13 @@ public final class TrickTakingRules {
         if (trick.isComplete()) {
             int taker = trick.taker();
             captured.get(taker).addAll(trick.cards());
+            List<Integer> takers = new ArrayList<>(state.trickTakers());
+            takers.add(taker);
             // Keep the completed trick on the table; the taker is the next to act.
-            return new TrickTakingState(state.contract(), hands, trick, captured, taker);
+            return new TrickTakingState(state.contract(), hands, trick, captured, takers, taker);
         }
-        return new TrickTakingState(state.contract(), hands, trick, captured, Seats.next(seat, state.playerCount()));
+        return new TrickTakingState(
+                state.contract(), hands, trick, captured, state.trickTakers(), Seats.next(seat, state.playerCount()));
     }
 
     /** Clear a finished trick (already captured) so the taker can lead a fresh one. */
@@ -79,33 +78,12 @@ public final class TrickTakingRules {
         }
         int taker = trick.taker();
         return new TrickTakingState(
-                state.contract(), state.hands(), Trick.startedBy(taker, state.playerCount()), state.captured(), taker);
-    }
-
-    public static Map<Integer, Integer> score(TrickTakingState state) {
-        if (!state.isComplete()) {
-            throw new IllegalStateException("round not complete");
-        }
-        return runningScores(state);
-    }
-
-    /** Per-seat penalty for what has been captured so far (valid mid-round). */
-    public static Map<Integer, Integer> runningScores(TrickTakingState state) {
-        Map<Integer, Integer> result = new LinkedHashMap<>();
-        for (int seat = 0; seat < state.playerCount(); seat++) {
-            result.put(seat, scoreSeat(state.contract(), state.captured().get(seat), state.playerCount()));
-        }
-        return result;
-    }
-
-    private static int scoreSeat(Contract contract, List<Card> captured, int playerCount) {
-        return switch (contract) {
-            case NO_TRICKS -> (captured.size() / playerCount) * ScoringConfig.PER_TRICK;
-            case NO_HEARTS -> (int) captured.stream().filter(Card::isHeart).count() * ScoringConfig.PER_HEART;
-            case NO_QUEENS -> (int) captured.stream().filter(Card::isQueen).count() * ScoringConfig.PER_QUEEN;
-            case NO_RED_KINGS -> (int) captured.stream().filter(Card::isRedKing).count() * ScoringConfig.PER_RED_KING;
-            case MONTANTE -> throw new IllegalArgumentException("montante is not a trick-taking contract");
-        };
+                state.contract(),
+                state.hands(),
+                Trick.startedBy(taker, state.playerCount()),
+                state.captured(),
+                state.trickTakers(),
+                taker);
     }
 
     private static List<List<Card>> mutableCopy(List<List<Card>> in) {

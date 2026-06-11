@@ -23,7 +23,12 @@ class TrickTakingRulesTest {
                 List.of(),
                 List.of());
         TrickTakingState s = new TrickTakingState(
-                Contract.NO_TRICKS, hands, Trick.startedBy(0, 4).withCard(c(Suit.HEARTS, Rank.TWO)), noCapture(4), 1);
+                Contract.NO_TRICKS,
+                hands,
+                Trick.startedBy(0, 4).withCard(c(Suit.HEARTS, Rank.TWO)),
+                noCapture(4),
+                List.of(),
+                1);
 
         assertEquals(List.of(new Move.PlayCard(c(Suit.HEARTS, Rank.KING))), TrickTakingRules.legalMoves(s, 1));
     }
@@ -36,7 +41,12 @@ class TrickTakingRulesTest {
                 List.of(),
                 List.of());
         TrickTakingState s = new TrickTakingState(
-                Contract.NO_TRICKS, hands, Trick.startedBy(0, 4).withCard(c(Suit.HEARTS, Rank.TWO)), noCapture(4), 1);
+                Contract.NO_TRICKS,
+                hands,
+                Trick.startedBy(0, 4).withCard(c(Suit.HEARTS, Rank.TWO)),
+                noCapture(4),
+                List.of(),
+                1);
 
         assertEquals(2, TrickTakingRules.legalMoves(s, 1).size());
     }
@@ -48,7 +58,8 @@ class TrickTakingRulesTest {
                 List.of(c(Suit.HEARTS, Rank.KING)),
                 List.of(c(Suit.HEARTS, Rank.NINE)),
                 List.of(c(Suit.HEARTS, Rank.FOUR)));
-        RoundState s = new TrickTakingState(Contract.NO_TRICKS, hands, Trick.startedBy(0, 4), noCapture(4), 0);
+        RoundState s =
+                new TrickTakingState(Contract.NO_TRICKS, hands, Trick.startedBy(0, 4), noCapture(4), List.of(), 0);
 
         s = TrickTakingRules.applyMove((TrickTakingState) s, 0, play(Suit.HEARTS, Rank.TWO));
         s = TrickTakingRules.applyMove((TrickTakingState) s, 1, play(Suit.HEARTS, Rank.KING));
@@ -64,7 +75,8 @@ class TrickTakingRulesTest {
     @Test
     void two_player_trick_completes_after_two_cards() {
         List<List<Card>> hands = List.of(List.of(c(Suit.HEARTS, Rank.TWO)), List.of(c(Suit.HEARTS, Rank.KING)));
-        RoundState s = new TrickTakingState(Contract.NO_TRICKS, hands, Trick.startedBy(0, 2), noCapture(2), 0);
+        RoundState s =
+                new TrickTakingState(Contract.NO_TRICKS, hands, Trick.startedBy(0, 2), noCapture(2), List.of(), 0);
         s = TrickTakingRules.applyMove((TrickTakingState) s, 0, play(Suit.HEARTS, Rank.TWO));
         s = TrickTakingRules.applyMove((TrickTakingState) s, 1, play(Suit.HEARTS, Rank.KING));
         assertTrue(s.isComplete());
@@ -79,47 +91,17 @@ class TrickTakingRulesTest {
                 List.of(),
                 List.of());
         TrickTakingState s = new TrickTakingState(
-                Contract.NO_TRICKS, hands, Trick.startedBy(0, 4).withCard(c(Suit.HEARTS, Rank.TWO)), noCapture(4), 1);
+                Contract.NO_TRICKS,
+                hands,
+                Trick.startedBy(0, 4).withCard(c(Suit.HEARTS, Rank.TWO)),
+                noCapture(4),
+                List.of(),
+                1);
 
         assertThrows(
                 IllegalArgumentException.class, () -> TrickTakingRules.applyMove(s, 1, play(Suit.SPADES, Rank.ACE)));
         assertThrows(
                 IllegalArgumentException.class, () -> TrickTakingRules.applyMove(s, 2, play(Suit.HEARTS, Rank.KING)));
-    }
-
-    @Test
-    void score_no_tricks_counts_tricks_as_captured_over_player_count() {
-        List<List<Card>> captured = List.of(List.of(), List.of(), eightCards(), List.of());
-        TrickTakingState s = completed(Contract.NO_TRICKS, captured);
-        assertEquals(-4, TrickTakingRules.score(s).get(2));
-        assertEquals(0, TrickTakingRules.score(s).get(0));
-    }
-
-    @Test
-    void score_hearts_queens_red_kings() {
-        List<List<Card>> hearts = List.of(
-                List.of(c(Suit.HEARTS, Rank.TWO), c(Suit.HEARTS, Rank.KING), c(Suit.SPADES, Rank.ACE)),
-                List.of(),
-                List.of(),
-                List.of());
-        assertEquals(
-                -4,
-                TrickTakingRules.score(completed(Contract.NO_HEARTS, hearts)).get(0));
-
-        List<List<Card>> kings = List.of(
-                List.of(c(Suit.HEARTS, Rank.KING), c(Suit.DIAMONDS, Rank.KING), c(Suit.SPADES, Rank.KING)),
-                List.of(),
-                List.of(),
-                List.of());
-        assertEquals(
-                -20,
-                TrickTakingRules.score(completed(Contract.NO_RED_KINGS, kings)).get(0));
-
-        List<List<Card>> queens = List.of(
-                List.of(c(Suit.SPADES, Rank.QUEEN), c(Suit.HEARTS, Rank.QUEEN)), List.of(), List.of(), List.of());
-        assertEquals(
-                -12,
-                TrickTakingRules.score(completed(Contract.NO_QUEENS, queens)).get(0));
     }
 
     private static Move play(Suit s, Rank r) {
@@ -130,18 +112,5 @@ class TrickTakingRulesTest {
         List<List<Card>> out = new java.util.ArrayList<>();
         for (int i = 0; i < n; i++) out.add(List.of());
         return out;
-    }
-
-    private static List<Card> eightCards() {
-        return List.of(
-                new Card(Suit.SPADES, Rank.TWO), new Card(Suit.SPADES, Rank.THREE),
-                new Card(Suit.SPADES, Rank.FOUR), new Card(Suit.SPADES, Rank.FIVE),
-                new Card(Suit.CLUBS, Rank.TWO), new Card(Suit.CLUBS, Rank.THREE),
-                new Card(Suit.CLUBS, Rank.FOUR), new Card(Suit.CLUBS, Rank.FIVE));
-    }
-
-    private static TrickTakingState completed(Contract contract, List<List<Card>> captured) {
-        return new TrickTakingState(
-                contract, List.of(List.of(), List.of(), List.of(), List.of()), Trick.startedBy(0, 4), captured, 0);
     }
 }

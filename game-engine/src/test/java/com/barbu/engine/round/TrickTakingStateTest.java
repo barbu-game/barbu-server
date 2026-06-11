@@ -26,6 +26,7 @@ class TrickTakingStateTest {
                 List.of(List.of(), List.of(), List.of()),
                 Trick.startedBy(0, 3),
                 List.of(List.of(), List.of(), List.of()),
+                List.of(),
                 0);
         assertTrue(done.isComplete());
     }
@@ -35,7 +36,12 @@ class TrickTakingStateTest {
         var mutable = new java.util.ArrayList<List<Card>>(
                 List.of(new java.util.ArrayList<>(List.of(new Card(Suit.SPADES, Rank.TWO))), List.of(), List.of()));
         TrickTakingState s = new TrickTakingState(
-                Contract.NO_TRICKS, mutable, Trick.startedBy(0, 3), List.of(List.of(), List.of(), List.of()), 0);
+                Contract.NO_TRICKS,
+                mutable,
+                Trick.startedBy(0, 3),
+                List.of(List.of(), List.of(), List.of()),
+                List.of(),
+                0);
         mutable.get(0).clear();
         assertEquals(1, s.hands().get(0).size());
     }
@@ -46,6 +52,7 @@ class TrickTakingStateTest {
                 hands,
                 Trick.startedBy(current, hands.size()),
                 List.of(List.of(), List.of(), List.of()),
+                List.of(),
                 current);
     }
 
