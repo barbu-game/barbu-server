@@ -7,8 +7,9 @@ micronaut:
       enabled: true
       configurations:
         web:
+          # Prod overrides CORS_ALLOWED_ORIGINS with the deployed web origin; defaults to dev.
           allowed-origins:
-            - http://localhost:3000
+            - ${CORS_ALLOWED_ORIGINS:`http://localhost:3000`}
   security:
     authentication: bearer
     intercept-url-map:

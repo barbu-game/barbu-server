@@ -13,7 +13,7 @@ public enum Rank {
     JACK(11, 11),
     QUEEN(12, 12),
     KING(13, 13),
-    ACE(14, 1);
+    ACE(14, 14);
 
     private final int trickStrength;
     private final int montanteValue;

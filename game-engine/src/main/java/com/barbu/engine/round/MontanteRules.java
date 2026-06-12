@@ -44,19 +44,23 @@ public final class MontanteRules {
         MontanteBoard board = state.board();
         List<Integer> finishing = new ArrayList<>(state.finishingOrder());
         int passStreak;
+        boolean replay = false;
 
         if (move instanceof Move.PlayCard play) {
             board = board.place(play.card());
             hands.get(seat).remove(play.card());
-            if (hands.get(seat).isEmpty()) {
+            boolean emptied = hands.get(seat).isEmpty();
+            if (emptied) {
                 finishing.add(seat);
             }
             passStreak = 0;
+            // Poser un As rend la main au même joueur tant qu'il lui reste un coup jouable.
+            replay = play.card().rank() == Rank.ACE && !emptied && canPlayAny(hands.get(seat), board);
         } else {
             passStreak = state.passStreak() + 1;
         }
 
-        int nextPlayer = nextActive(seat, hands);
+        int nextPlayer = replay ? seat : nextActive(seat, hands);
         return new MontanteState(hands, board, finishing, passStreak, nextPlayer);
     }
 
@@ -71,6 +75,15 @@ public final class MontanteRules {
             result.put(order.get(place), ranking[place]);
         }
         return result;
+    }
+
+    private static boolean canPlayAny(List<Card> hand, MontanteBoard board) {
+        for (Card card : hand) {
+            if (board.isPlayable(card)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static boolean isBoardEmpty(MontanteBoard board) {

@@ -15,6 +15,88 @@ class MontanteRulesTest {
         return new Card(s, r);
     }
 
+    /** Open {@code suit} all the way up to the King, so the Ace becomes playable on its high end. */
+    private static MontanteBoard openedToKing(Suit suit) {
+        MontanteBoard b = MontanteBoard.empty();
+        for (Rank r : new Rank[] {Rank.EIGHT, Rank.NINE, Rank.TEN, Rank.JACK, Rank.QUEEN, Rank.KING}) {
+            b = b.place(c(suit, r));
+        }
+        return b;
+    }
+
+    @Test
+    void playing_an_ace_grants_a_replay_to_the_same_seat() {
+        MontanteState s = new MontanteState(
+                List.of(List.of(c(Suit.HEARTS, Rank.ACE), c(Suit.HEARTS, Rank.SEVEN)), List.of(), List.of(), List.of()),
+                openedToKing(Suit.HEARTS),
+                List.of(),
+                0,
+                0);
+        MontanteState after =
+                (MontanteState) MontanteRules.applyMove(s, 0, new Move.PlayCard(c(Suit.HEARTS, Rank.ACE)));
+        assertEquals(0, after.currentPlayer());
+        assertEquals(List.of(), after.finishingOrder());
+        assertEquals(0, after.passStreak());
+    }
+
+    @Test
+    void ace_replay_chains_through_further_aces_then_ends_on_a_normal_card() {
+        MontanteState s = new MontanteState(
+                List.of(
+                        List.of(c(Suit.HEARTS, Rank.ACE), c(Suit.SPADES, Rank.ACE), c(Suit.HEARTS, Rank.SEVEN)),
+                        List.of(c(Suit.CLUBS, Rank.TWO)),
+                        List.of(),
+                        List.of()),
+                openedToKing(Suit.HEARTS)
+                        .place(c(Suit.SPADES, Rank.EIGHT))
+                        .place(c(Suit.SPADES, Rank.NINE))
+                        .place(c(Suit.SPADES, Rank.TEN))
+                        .place(c(Suit.SPADES, Rank.JACK))
+                        .place(c(Suit.SPADES, Rank.QUEEN))
+                        .place(c(Suit.SPADES, Rank.KING)),
+                List.of(),
+                0,
+                0);
+        MontanteState a1 = (MontanteState) MontanteRules.applyMove(s, 0, new Move.PlayCard(c(Suit.HEARTS, Rank.ACE)));
+        assertEquals(0, a1.currentPlayer(), "first Ace keeps the turn");
+        MontanteState a2 = (MontanteState) MontanteRules.applyMove(a1, 0, new Move.PlayCard(c(Suit.SPADES, Rank.ACE)));
+        assertEquals(0, a2.currentPlayer(), "second Ace keeps the turn again");
+        MontanteState a3 =
+                (MontanteState) MontanteRules.applyMove(a2, 0, new Move.PlayCard(c(Suit.HEARTS, Rank.SEVEN)));
+        assertEquals(1, a3.currentPlayer(), "a normal card ends the turn");
+    }
+
+    @Test
+    void ace_with_no_remaining_legal_move_ends_the_turn() {
+        MontanteState s = new MontanteState(
+                List.of(
+                        List.of(c(Suit.HEARTS, Rank.ACE), c(Suit.SPADES, Rank.TWO)),
+                        List.of(c(Suit.CLUBS, Rank.TWO)),
+                        List.of(),
+                        List.of()),
+                openedToKing(Suit.HEARTS),
+                List.of(),
+                0,
+                0);
+        MontanteState after =
+                (MontanteState) MontanteRules.applyMove(s, 0, new Move.PlayCard(c(Suit.HEARTS, Rank.ACE)));
+        assertEquals(1, after.currentPlayer());
+    }
+
+    @Test
+    void ace_that_empties_the_hand_finishes_without_replay() {
+        MontanteState s = new MontanteState(
+                List.of(List.of(c(Suit.HEARTS, Rank.ACE)), List.of(c(Suit.CLUBS, Rank.TWO)), List.of(), List.of()),
+                openedToKing(Suit.HEARTS),
+                List.of(),
+                0,
+                0);
+        MontanteState after =
+                (MontanteState) MontanteRules.applyMove(s, 0, new Move.PlayCard(c(Suit.HEARTS, Rank.ACE)));
+        assertEquals(List.of(0), after.finishingOrder());
+        assertEquals(1, after.currentPlayer());
+    }
+
     @Test
     void opening_move_must_be_eight_of_diamonds() {
         MontanteState s = new MontanteState(

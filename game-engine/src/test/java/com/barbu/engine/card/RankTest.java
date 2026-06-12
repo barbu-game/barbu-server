@@ -13,8 +13,9 @@ class RankTest {
     }
 
     @Test
-    void ace_is_low_in_montante() {
-        assertEquals(1, Rank.ACE.montanteValue());
+    void ace_is_high_in_montante() {
+        assertEquals(14, Rank.ACE.montanteValue());
+        assertTrue(Rank.ACE.montanteValue() > Rank.KING.montanteValue());
         assertEquals(8, Rank.EIGHT.montanteValue());
         assertEquals(13, Rank.KING.montanteValue());
     }

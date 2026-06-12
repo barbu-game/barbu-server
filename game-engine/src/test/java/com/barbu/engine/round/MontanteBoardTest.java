@@ -33,13 +33,22 @@ class MontanteBoardTest {
     }
 
     @Test
-    void extends_down_to_ace_and_up_to_king() {
+    void extends_down_to_two() {
         MontanteBoard b = MontanteBoard.empty().place(c(Suit.SPADES, Rank.EIGHT));
-        for (Rank r : new Rank[] {Rank.SEVEN, Rank.SIX, Rank.FIVE, Rank.FOUR, Rank.THREE, Rank.TWO, Rank.ACE}) {
+        for (Rank r : new Rank[] {Rank.SEVEN, Rank.SIX, Rank.FIVE, Rank.FOUR, Rank.THREE, Rank.TWO}) {
             assertTrue(b.isPlayable(c(Suit.SPADES, r)), "down to " + r);
             b = b.place(c(Suit.SPADES, r));
         }
-        assertFalse(b.isPlayable(c(Suit.SPADES, Rank.ACE)));
+        assertFalse(b.isPlayable(c(Suit.SPADES, Rank.ACE)), "Ace is high, never extends the low end");
+    }
+
+    @Test
+    void extends_up_to_ace_on_top_of_king() {
+        MontanteBoard b = MontanteBoard.empty().place(c(Suit.SPADES, Rank.EIGHT));
+        for (Rank r : new Rank[] {Rank.NINE, Rank.TEN, Rank.JACK, Rank.QUEEN, Rank.KING, Rank.ACE}) {
+            assertTrue(b.isPlayable(c(Suit.SPADES, r)), "up to " + r);
+            b = b.place(c(Suit.SPADES, r));
+        }
     }
 
     @Test
