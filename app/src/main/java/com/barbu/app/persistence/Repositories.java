@@ -2,12 +2,15 @@ package com.barbu.app.persistence;
 
 import com.barbu.app.persistence.Entities.GameEntity;
 import com.barbu.app.persistence.Entities.GamePlayerEntity;
+import com.barbu.app.persistence.Entities.PlayerRatingEntity;
 import com.barbu.app.persistence.Entities.RoundEntity;
 import com.barbu.app.persistence.Entities.RoundScoreEntity;
 import com.barbu.app.persistence.Entities.UserEntity;
 import io.micronaut.data.jdbc.annotation.JdbcRepository;
+import io.micronaut.data.model.Pageable;
 import io.micronaut.data.model.query.builder.sql.Dialect;
 import io.micronaut.data.repository.CrudRepository;
+import java.util.List;
 import java.util.Optional;
 
 public final class Repositories {
@@ -35,4 +38,9 @@ public final class Repositories {
 
     @JdbcRepository(dialect = Dialect.POSTGRES)
     public interface RoundScoreRepository extends CrudRepository<RoundScoreEntity, Long> {}
+
+    @JdbcRepository(dialect = Dialect.POSTGRES)
+    public interface PlayerRatingRepository extends CrudRepository<PlayerRatingEntity, Long> {
+        List<PlayerRatingEntity> findAllOrderByRatingDesc(Pageable pageable);
+    }
 }

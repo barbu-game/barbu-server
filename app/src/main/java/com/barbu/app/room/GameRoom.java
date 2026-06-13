@@ -4,6 +4,7 @@ import com.barbu.app.persistence.MatchRecorder;
 import com.barbu.app.protocol.ChatBroadcast;
 import com.barbu.app.protocol.ChatFilter;
 import com.barbu.app.protocol.Codec;
+import com.barbu.app.rating.RatingService;
 import com.barbu.bot.BotStrategy;
 import com.barbu.bot.HeuristicBot;
 import com.barbu.engine.card.Card;
@@ -44,6 +45,8 @@ public final class GameRoom {
     private final long botDelayMs;
     private final MatchRecorder recorder;
     private final com.barbu.app.metrics.GameMetrics metrics;
+    private final String mode;
+    private final RatingService ratingService;
     private final BotStrategy bot = new HeuristicBot();
 
     private static final long VOTE_TIMEOUT_MS = 15000;
@@ -75,6 +78,20 @@ public final class GameRoom {
             long botDelayMs,
             MatchRecorder recorder,
             com.barbu.app.metrics.GameMetrics metrics) {
+        this(id, playerCount, variant, mapper, scheduler, botDelayMs, recorder, metrics, "private", null);
+    }
+
+    GameRoom(
+            String id,
+            int playerCount,
+            Variant variant,
+            ObjectMapper mapper,
+            ScheduledExecutorService scheduler,
+            long botDelayMs,
+            MatchRecorder recorder,
+            com.barbu.app.metrics.GameMetrics metrics,
+            String mode,
+            RatingService ratingService) {
         this.id = id;
         this.playerCount = playerCount;
         this.variant = variant;
@@ -83,6 +100,8 @@ public final class GameRoom {
         this.botDelayMs = botDelayMs;
         this.recorder = recorder;
         this.metrics = metrics;
+        this.mode = mode;
+        this.ratingService = ratingService;
         this.names = new String[playerCount];
         this.isBot = new boolean[playerCount];
         this.userIds = new Long[playerCount];
@@ -487,10 +506,36 @@ public final class GameRoom {
             players.add(new MatchRecorder.PlayerInfo(seat, names[seat], isBot[seat], userIds[seat]));
         }
         try {
-            recorder.record("private", match, players);
+            recorder.record(mode, match, players);
         } catch (Exception ignored) {
             // persistence is best-effort; a failure must not interrupt play
         }
+
+        if (ratingService != null && "ranked".equals(mode) && MatchEngine.isComplete(match)) {
+            try {
+                List<Integer> standings = MatchEngine.standings(match);
+                List<RatingService.SeatRating> seats = new ArrayList<>(playerCount);
+                for (int seat = 0; seat < playerCount; seat++) {
+                    int rank = standings.indexOf(seat) + 1;
+                    seats.add(new RatingService.SeatRating(seat, userIds[seat], isBot[seat], rank));
+                }
+                broadcastRankedResult(ratingService.applyRankedResult(seats));
+            } catch (Exception ignored) {
+                // l'ELO est best-effort : un échec ne doit pas interrompre la fin de partie
+            }
+        }
+    }
+
+    private void broadcastRankedResult(List<RatingService.RatingUpdate> updates) {
+        List<Map<String, Object>> entries = new ArrayList<>(updates.size());
+        for (RatingService.RatingUpdate u : updates) {
+            entries.add(Map.of(
+                    "seat", u.seat(),
+                    "ratingBefore", u.before(),
+                    "ratingAfter", u.after(),
+                    "delta", u.delta()));
+        }
+        broadcastRaw(Map.of("type", "rankedResult", "entries", entries));
     }
 
     public synchronized Map<String, Object> viewFor(int seat) {

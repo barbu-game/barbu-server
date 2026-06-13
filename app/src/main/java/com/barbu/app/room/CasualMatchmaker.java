@@ -16,11 +16,11 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Public matchmaking: queue players by desired table size, match as soon as enough
- * humans are waiting, otherwise fill the table with bots after a short timeout.
+ * Casual matchmaking: queue players by desired table size, match as soon as enough
+ * humans are waiting, otherwise fill the table with bots after a short timeout. Unranked.
  */
 @Singleton
-public class InMemoryMatchmaker {
+public class CasualMatchmaker implements Matchmaker {
 
     private static final long FILL_TIMEOUT_MS = 8000;
 
@@ -29,7 +29,7 @@ public class InMemoryMatchmaker {
     private final Map<Integer, Deque<Waiting>> queues = new HashMap<>();
     private final Map<Integer, ScheduledFuture<?>> timeouts = new HashMap<>();
 
-    public InMemoryMatchmaker(RoomManager rooms) {
+    public CasualMatchmaker(RoomManager rooms) {
         this.rooms = rooms;
     }
 
@@ -89,7 +89,7 @@ public class InMemoryMatchmaker {
             pending.cancel(false);
         }
 
-        GameRoom room = rooms.create(size, Variants.DEVELOPER);
+        GameRoom room = rooms.create(size, Variants.DEVELOPER, "casual");
         for (Waiting w : taken) {
             String name = w.session().get("username", String.class).orElse(w.name());
             Long userId = w.session().get("userId", Long.class).orElse(null);

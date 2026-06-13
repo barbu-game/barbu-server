@@ -40,4 +40,7 @@ public final class Entities {
 
     @MappedEntity("round_scores")
     public record RoundScoreEntity(@Id @GeneratedValue Long id, long roundId, int seat, int points) {}
+
+    @MappedEntity("player_ratings")
+    public record PlayerRatingEntity(@Id Long userId, int rating, int gamesPlayed, Instant updatedAt) {}
 }

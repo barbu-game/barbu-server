@@ -1,6 +1,7 @@
 package com.barbu.app.room;
 
 import com.barbu.app.persistence.MatchRecorder;
+import com.barbu.app.rating.RatingService;
 import com.barbu.engine.variant.Variant;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micronaut.context.annotation.Value;
@@ -21,6 +22,7 @@ public class RoomManager {
     private final ObjectMapper mapper;
     private final MatchRecorder recorder;
     private final com.barbu.app.metrics.GameMetrics metrics;
+    private final RatingService ratingService;
     private final long botDelayMs;
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
     private final Random random = new Random();
@@ -29,17 +31,24 @@ public class RoomManager {
             ObjectMapper mapper,
             MatchRecorder recorder,
             com.barbu.app.metrics.GameMetrics metrics,
+            RatingService ratingService,
             @Value("${barbu.bot-delay-ms:650}") long botDelayMs) {
         this.mapper = mapper;
         this.recorder = recorder;
         this.metrics = metrics;
+        this.ratingService = ratingService;
         this.botDelayMs = botDelayMs;
     }
 
     public GameRoom create(int requestedPlayerCount, Variant variant) {
+        return create(requestedPlayerCount, variant, "private");
+    }
+
+    public GameRoom create(int requestedPlayerCount, Variant variant, String mode) {
         int playerCount = Math.clamp(requestedPlayerCount, 2, 10);
         String id = newCode();
-        GameRoom room = new GameRoom(id, playerCount, variant, mapper, scheduler, botDelayMs, recorder, metrics);
+        GameRoom room = new GameRoom(
+                id, playerCount, variant, mapper, scheduler, botDelayMs, recorder, metrics, mode, ratingService);
         rooms.put(id, room);
         return room;
     }
