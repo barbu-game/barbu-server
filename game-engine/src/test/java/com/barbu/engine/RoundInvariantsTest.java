@@ -8,6 +8,8 @@ import com.barbu.engine.match.MatchEngine;
 import com.barbu.engine.model.Contract;
 import com.barbu.engine.round.RoundEngine;
 import com.barbu.engine.round.RoundState;
+import com.barbu.engine.round.TrickTakingState;
+import com.barbu.engine.scoring.TrickScoringRule;
 import com.barbu.engine.variant.Variants;
 import java.util.ArrayList;
 import java.util.List;
@@ -56,6 +58,31 @@ class RoundInvariantsTest {
             total += p;
         }
         assertEquals(-2 * tricks, total, "n=" + n + " seed=" + seed);
+    }
+
+    @Property
+    void stopping_a_card_contract_early_scores_the_same_as_playing_to_the_end(
+            @ForAll @IntRange(min = 2, max = 10) int n, @ForAll @LongRange(min = 0, max = 400) long seed) {
+        TrickScoringRule rule = Variants.DEVELOPER.trickRules().get(Contract.NO_RED_KINGS);
+        RoundState s = RoundEngine.startTrickTaking(Contract.NO_RED_KINGS, deal(n, seed), 1);
+        int[] scoreAtExhaustion = null;
+        while (!s.isComplete()) {
+            TrickTakingState t = (TrickTakingState) s;
+            boolean atBoundary =
+                    t.currentTrick().isComplete() || t.currentTrick().cards().isEmpty();
+            if (scoreAtExhaustion == null && atBoundary && rule.exhausted(t.hands())) {
+                scoreAtExhaustion =
+                        MatchEngine.scoreRound(Variants.DEVELOPER, s).points();
+            }
+            s = RoundEngine.applyMove(
+                    s,
+                    s.currentPlayer(),
+                    RoundEngine.legalMoves(s, s.currentPlayer()).get(0));
+        }
+        if (scoreAtExhaustion != null) {
+            int[] finalScore = MatchEngine.scoreRound(Variants.DEVELOPER, s).points();
+            assertArrayEquals(scoreAtExhaustion, finalScore, "n=" + n + " seed=" + seed);
+        }
     }
 
     @Property

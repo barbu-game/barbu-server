@@ -110,20 +110,20 @@ public final class MatchEngine {
             throw new IllegalStateException("no round in progress");
         }
         RoundState round = RoundEngine.applyMove(m.round(), seat, move);
-        if (!round.isComplete()) {
-            return new MatchState(
-                    m.playerCount(),
-                    m.seed(),
-                    m.dealer(),
-                    m.roundNumber(),
-                    m.plannedRounds(),
-                    m.playedByDealer(),
-                    round,
-                    m.totals(),
-                    m.history(),
-                    m.variant());
+        if (roundOver(m.variant(), round)) {
+            return settleRound(m, round);
         }
-        return settleRound(m, round);
+        return new MatchState(
+                m.playerCount(),
+                m.seed(),
+                m.dealer(),
+                m.roundNumber(),
+                m.plannedRounds(),
+                m.playedByDealer(),
+                round,
+                m.totals(),
+                m.history(),
+                m.variant());
     }
 
     /** Apply a move without settling a finished round, so callers can pause first. */
@@ -164,12 +164,39 @@ public final class MatchEngine {
                 m.variant());
     }
 
-    /** Score and close the current round if it is complete; otherwise a no-op. */
+    /** Score and close the current round if it is over; otherwise a no-op. */
     public static MatchState settle(MatchState m) {
-        if (m.round() == null || !m.round().isComplete()) {
+        if (m.round() == null || !roundOver(m.variant(), m.round())) {
             return m;
         }
         return settleRound(m, m.round());
+    }
+
+    /**
+     * Whether the in-progress round can no longer change any score, so it may be settled. True
+     * when every card is played, and also when a contract's remaining cards are all harmless —
+     * e.g. both red kings already captured — letting the table skip to the next round.
+     */
+    public static boolean roundOver(MatchState m) {
+        return m.round() != null && roundOver(m.variant(), m.round());
+    }
+
+    private static boolean roundOver(Variant variant, RoundState round) {
+        if (round.isComplete()) {
+            return true;
+        }
+        if (round instanceof TrickTakingState t) {
+            // Only judge exhaustion at a trick boundary: mid-trick, a played card has left its
+            // hand but is not yet captured, so it would be missed from the score.
+            boolean atBoundary =
+                    t.currentTrick().isComplete() || t.currentTrick().cards().isEmpty();
+            if (!atBoundary) {
+                return false;
+            }
+            TrickScoringRule rule = variant.trickRules().get(t.contract());
+            return rule != null && rule.exhausted(t.hands());
+        }
+        return false;
     }
 
     public static MatchState playOut(MatchState m) {

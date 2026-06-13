@@ -341,7 +341,7 @@ public final class GameRoom {
     }
 
     private boolean roundJustCompleted() {
-        return match != null && match.round() != null && match.round().isComplete();
+        return match != null && MatchEngine.roundOver(match);
     }
 
     /** A trick is finished but still displayed; the taker has not led the next one yet. */

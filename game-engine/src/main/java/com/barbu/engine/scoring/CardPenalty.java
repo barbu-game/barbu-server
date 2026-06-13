@@ -1,6 +1,7 @@
 package com.barbu.engine.scoring;
 
 import com.barbu.engine.card.Card;
+import java.util.List;
 import java.util.function.Predicate;
 
 /** Penalty per captured card matching {@code match} (e.g. each heart, each queen). */
@@ -24,5 +25,11 @@ public record CardPenalty(Predicate<Card> match, int pointsPerCard, String label
     @Override
     public String describe() {
         return pointsPerCard + " per " + label;
+    }
+
+    /** All scoring cards are already captured once none remain in any hand. */
+    @Override
+    public boolean exhausted(List<List<Card>> remainingHands) {
+        return remainingHands.stream().flatMap(List::stream).noneMatch(match);
     }
 }
