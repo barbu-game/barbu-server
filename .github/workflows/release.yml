@@ -81,3 +81,11 @@ jobs:
       context: .
       dockerfile: app/Dockerfile
     secrets: inherit
+
+  bump-deploy:
+    needs: [release, build-image]
+    uses: barbu-game/barbu-actions/.github/workflows/bump-deploy.yml@main
+    with:
+      chart: charts/barbu-server
+      version: ${{ needs.release.outputs.version }}
+    secrets: inherit
