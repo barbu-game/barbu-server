@@ -13,9 +13,10 @@ import java.util.Comparator;
 import java.util.List;
 
 /**
- * A pragmatic, non-learning strategy: shed dangerous cards while losing tricks for
- * the negative contracts, and unload extreme cards first in the montante. Good enough
- * to fill empty seats; not an optimal player.
+ * A pragmatic, non-learning strategy: shed dangerous cards while ducking tricks for
+ * the negative contracts — but in per-card contracts it grabs a penalty-free trick when
+ * it can do so risk-free, dumping a high card rather than hoarding it. Unloads extreme
+ * cards first in the montante. Good enough to fill empty seats; not an optimal player.
  */
 public final class HeuristicBot implements BotStrategy {
 
@@ -50,6 +51,11 @@ public final class HeuristicBot implements BotStrategy {
                 .filter(c -> c.suit() != led || c.rank().trickStrength() < winningStrength)
                 .toList();
 
+        Move freeTake = freeTake(contract, trick, cards, led, winningStrength);
+        if (freeTake != null) {
+            return freeTake;
+        }
+
         if (!losing.isEmpty()) {
             Card shed = losing.stream()
                     .max(Comparator.comparingInt((Card c) -> danger(contract, c))
@@ -62,6 +68,33 @@ public final class HeuristicBot implements BotStrategy {
                 .min(Comparator.comparingInt(c -> c.rank().trickStrength()))
                 .orElseThrow();
         return new Move.PlayCard(lowest);
+    }
+
+    /**
+     * In a per-card contract a trick carrying no penalty card is free to take. On the trick's
+     * final card we can grab it with our most dangerous high card — shedding a future liability
+     * at zero cost. We only do this as the last player so no one can still discard a penalty
+     * onto the trick after us; returns {@code null} when taking is unsafe or pointless.
+     */
+    private static Move freeTake(Contract contract, Trick trick, List<Card> cards, Suit led, int winningStrength) {
+        if (!isCardPenaltyContract(contract)
+                || trick.cards().size() != trick.playerCount() - 1
+                || trick.cards().stream().anyMatch(c -> danger(contract, c) > 0)) {
+            return null;
+        }
+        return cards.stream()
+                .filter(c -> c.suit() == led && c.rank().trickStrength() > winningStrength)
+                .filter(c -> danger(contract, c) == 0)
+                .max(Comparator.comparingInt(c -> c.rank().trickStrength()))
+                .map(c -> (Move) new Move.PlayCard(c))
+                .orElse(null);
+    }
+
+    private static boolean isCardPenaltyContract(Contract contract) {
+        return switch (contract) {
+            case NO_HEARTS, NO_QUEENS, NO_RED_KINGS, NO_KING_OF_HEARTS, NO_JACKS -> true;
+            default -> false;
+        };
     }
 
     private Move chooseMontanteMove(List<Move> legal) {

@@ -66,6 +66,62 @@ class HeuristicBotTest {
     }
 
     @Test
+    void takes_a_penalty_free_trick_to_shed_a_high_card_under_no_hearts() {
+        // Heads-up: seat 1 is last to play onto a hearts-free trick, so taking it costs
+        // nothing — and should be preferred, dumping the dangerous Ace rather than the deuce.
+        List<List<Card>> hands = List.of(
+                List.of(c(Suit.SPADES, Rank.KING)), List.of(c(Suit.SPADES, Rank.ACE), c(Suit.SPADES, Rank.TWO)));
+        TrickTakingState s = new TrickTakingState(
+                Contract.NO_HEARTS,
+                hands,
+                Trick.startedBy(0, 2).withCard(c(Suit.SPADES, Rank.KING)),
+                List.of(List.of(), List.of()),
+                List.of(),
+                1);
+
+        Move move = bot.chooseMove(s, 1);
+        assertEquals(new Move.PlayCard(c(Suit.SPADES, Rank.ACE)), move);
+    }
+
+    @Test
+    void still_loses_a_trick_holding_a_heart_under_no_hearts() {
+        // seat 1 discarded a heart into the trick, so seat 2 (last) must duck under the King
+        // rather than scoop up the heart, even though taking is otherwise possible.
+        List<List<Card>> hands = List.of(
+                List.of(c(Suit.SPADES, Rank.KING)),
+                List.of(c(Suit.HEARTS, Rank.FIVE)),
+                List.of(c(Suit.SPADES, Rank.ACE), c(Suit.SPADES, Rank.TWO)));
+        TrickTakingState s = new TrickTakingState(
+                Contract.NO_HEARTS,
+                hands,
+                Trick.startedBy(0, 3).withCard(c(Suit.SPADES, Rank.KING)).withCard(c(Suit.HEARTS, Rank.FIVE)),
+                List.of(List.of(), List.of(), List.of()),
+                List.of(),
+                2);
+
+        Move move = bot.chooseMove(s, 2);
+        assertEquals(new Move.PlayCard(c(Suit.SPADES, Rank.TWO)), move);
+    }
+
+    @Test
+    void still_ducks_the_last_card_under_no_tricks() {
+        // Every trick is a penalty under NO_TRICKS, so the free-take heuristic must not apply:
+        // seat 1, last to play, ducks under the King instead of grabbing the trick.
+        List<List<Card>> hands = List.of(
+                List.of(c(Suit.SPADES, Rank.KING)), List.of(c(Suit.SPADES, Rank.ACE), c(Suit.SPADES, Rank.TWO)));
+        TrickTakingState s = new TrickTakingState(
+                Contract.NO_TRICKS,
+                hands,
+                Trick.startedBy(0, 2).withCard(c(Suit.SPADES, Rank.KING)),
+                List.of(List.of(), List.of()),
+                List.of(),
+                1);
+
+        Move move = bot.chooseMove(s, 1);
+        assertEquals(new Move.PlayCard(c(Suit.SPADES, Rank.TWO)), move);
+    }
+
+    @Test
     void avoids_winning_the_trick_under_no_tricks() {
         List<List<Card>> hands = List.of(
                 List.of(c(Suit.SPADES, Rank.TEN)),
