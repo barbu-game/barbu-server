@@ -23,6 +23,7 @@ public class RoomManager {
     private final MatchRecorder recorder;
     private final com.barbu.app.metrics.GameMetrics metrics;
     private final RatingService ratingService;
+    private final ReconnectIndex reconnectIndex;
     private final long botDelayMs;
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
     private final Random random = new Random();
@@ -32,11 +33,13 @@ public class RoomManager {
             MatchRecorder recorder,
             com.barbu.app.metrics.GameMetrics metrics,
             RatingService ratingService,
+            ReconnectIndex reconnectIndex,
             @Value("${barbu.bot-delay-ms:650}") long botDelayMs) {
         this.mapper = mapper;
         this.recorder = recorder;
         this.metrics = metrics;
         this.ratingService = ratingService;
+        this.reconnectIndex = reconnectIndex;
         this.botDelayMs = botDelayMs;
     }
 
@@ -48,7 +51,17 @@ public class RoomManager {
         int playerCount = Math.clamp(requestedPlayerCount, 2, 10);
         String id = newCode();
         GameRoom room = new GameRoom(
-                id, playerCount, variant, mapper, scheduler, botDelayMs, recorder, metrics, mode, ratingService);
+                id,
+                playerCount,
+                variant,
+                mapper,
+                scheduler,
+                botDelayMs,
+                recorder,
+                metrics,
+                mode,
+                ratingService,
+                reconnectIndex);
         rooms.put(id, room);
         return room;
     }
@@ -57,8 +70,19 @@ public class RoomManager {
         return id == null ? null : rooms.get(id);
     }
 
+    public GameRoom roomForUser(long userId) {
+        return get(reconnectIndex.roomForUser(userId));
+    }
+
+    public GameRoom roomForToken(String token) {
+        return get(reconnectIndex.roomForToken(token));
+    }
+
     public void remove(String id) {
-        rooms.remove(id);
+        GameRoom room = rooms.remove(id);
+        if (room != null) {
+            room.clearReconnectEntries(reconnectIndex);
+        }
     }
 
     public int activeRoomCount() {

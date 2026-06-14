@@ -4,6 +4,7 @@ import com.barbu.app.auth.JwtVerifier;
 import com.barbu.app.persistence.Repositories.UserRepository;
 import com.barbu.app.protocol.ChatSend;
 import com.barbu.app.protocol.Codec;
+import com.barbu.app.protocol.ResumeCommand;
 import com.barbu.app.room.CasualMatchmaker;
 import com.barbu.app.room.GameRoom;
 import com.barbu.app.room.RankedMatchmaker;
@@ -151,6 +152,22 @@ public class GameWebSocket {
             case "chat" -> {
                 ChatSend chat = mapper.convertValue(command, ChatSend.class);
                 withRoomSeat(session, (room, seat) -> room.chat(seat, chat.text()));
+            }
+            case "resume" -> {
+                authenticate(session, asString(command.get("token")));
+                ResumeCommand cmd = mapper.convertValue(command, ResumeCommand.class);
+                Long userId = accountId(session);
+                String resumeToken = cmd.resumeToken();
+                GameRoom room = resumeToken != null
+                        ? rooms.roomForToken(resumeToken)
+                        : (userId != null ? rooms.roomForUser(userId) : null);
+                int seat = room == null ? -1 : room.reclaim(session, userId, resumeToken);
+                if (seat < 0) {
+                    send(session, Map.of("type", "resumeUnavailable"));
+                    return;
+                }
+                bind(session, room.id(), seat);
+                sendJoined(session, room.id(), seat);
             }
             default -> sendError(session, "unknown command: " + type);
         }

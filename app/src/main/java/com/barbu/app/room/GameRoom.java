@@ -27,6 +27,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -59,6 +60,8 @@ public final class GameRoom {
     private final Long[] userIds;
     private final WebSocketSession[] sessions;
     private final long[] lastChatAt;
+    private final String[] resumeTokens;
+    private final ReconnectIndex reconnectIndex;
     private final ChatFilter chatFilter = new ChatFilter();
 
     private MatchState match;
@@ -78,7 +81,7 @@ public final class GameRoom {
             long botDelayMs,
             MatchRecorder recorder,
             com.barbu.app.metrics.GameMetrics metrics) {
-        this(id, playerCount, variant, mapper, scheduler, botDelayMs, recorder, metrics, "private", null);
+        this(id, playerCount, variant, mapper, scheduler, botDelayMs, recorder, metrics, "private", null, null);
     }
 
     GameRoom(
@@ -91,7 +94,8 @@ public final class GameRoom {
             MatchRecorder recorder,
             com.barbu.app.metrics.GameMetrics metrics,
             String mode,
-            RatingService ratingService) {
+            RatingService ratingService,
+            ReconnectIndex reconnectIndex) {
         this.id = id;
         this.playerCount = playerCount;
         this.variant = variant;
@@ -102,11 +106,13 @@ public final class GameRoom {
         this.metrics = metrics;
         this.mode = mode;
         this.ratingService = ratingService;
+        this.reconnectIndex = reconnectIndex;
         this.names = new String[playerCount];
         this.isBot = new boolean[playerCount];
         this.userIds = new Long[playerCount];
         this.sessions = new WebSocketSession[playerCount];
         this.lastChatAt = new long[playerCount];
+        this.resumeTokens = new String[playerCount];
     }
 
     public String id() {
@@ -142,6 +148,10 @@ public final class GameRoom {
         names[seat] = name == null || name.isBlank() ? "Player " + seat : name;
         userIds[seat] = userId;
         isBot[seat] = false;
+        resumeTokens[seat] = UUID.randomUUID().toString();
+        if (reconnectIndex != null) {
+            reconnectIndex.register(userId, resumeTokens[seat], id);
+        }
         return seat;
     }
 
@@ -223,6 +233,28 @@ public final class GameRoom {
     }
 
     /**
+     * Index du siège déconnecté que ce revenant peut reprendre, ou -1. Le token (capacité d'invité)
+     * prime sur le userId. {@code occupied[s]} = une session est déjà active sur le siège.
+     */
+    static int reclaimableSeat(Long userId, String token, Long[] userIds, String[] tokens, boolean[] occupied) {
+        if (token != null) {
+            for (int s = 0; s < tokens.length; s++) {
+                if (!occupied[s] && token.equals(tokens[s])) {
+                    return s;
+                }
+            }
+        }
+        if (userId != null) {
+            for (int s = 0; s < userIds.length; s++) {
+                if (!occupied[s] && userId.equals(userIds[s])) {
+                    return s;
+                }
+            }
+        }
+        return -1;
+    }
+
+    /**
      * Décide d'un message de tchat sans aucun effet de bord : renvoie le {@link ChatBroadcast}
      * à diffuser, ou vide si le message est ignoré (siège bot, texte vide, ou anti-spam).
      */
@@ -255,6 +287,35 @@ public final class GameRoom {
             isBot[seat] = true;
             broadcast();
             scheduleBotsIfNeeded();
+        }
+    }
+
+    /**
+     * Un revenant reprend son siège : rebind la session, lève le bot, diffuse. Renvoie le siège
+     * repris, ou -1 si aucun siège déconnecté ne lui appartient.
+     */
+    public synchronized int reclaim(WebSocketSession session, Long userId, String token) {
+        boolean[] occupied = new boolean[playerCount];
+        for (int s = 0; s < playerCount; s++) {
+            occupied[s] = sessions[s] != null;
+        }
+        int seat = reclaimableSeat(userId, token, userIds, resumeTokens, occupied);
+        if (seat < 0) {
+            return -1;
+        }
+        sessions[seat] = session;
+        isBot[seat] = false;
+        broadcast();
+        return seat;
+    }
+
+    /** Purge les entrées d'index de tous les sièges (appelé à la destruction de la room). */
+    public synchronized void clearReconnectEntries(ReconnectIndex index) {
+        if (index == null) {
+            return;
+        }
+        for (int s = 0; s < playerCount; s++) {
+            index.forget(userIds[s], resumeTokens[s], id);
         }
     }
 
@@ -544,6 +605,9 @@ public final class GameRoom {
         view.put("roomId", id);
         view.put("playerCount", playerCount);
         view.put("yourSeat", seat);
+        if (resumeTokens[seat] != null) {
+            view.put("resumeToken", resumeTokens[seat]);
+        }
         view.put("phase", phase());
         view.put("players", playersInfo());
 
