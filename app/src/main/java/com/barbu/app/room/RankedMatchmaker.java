@@ -64,6 +64,11 @@ public class RankedMatchmaker implements Matchmaker {
         if (userId == null) {
             return; // ranked exige un compte ; le WebSocket a déjà renvoyé l'erreur
         }
+        // Idempotent par compte : clics répétés ou second onglet ne créent qu'un seul siège en file
+        // (sinon un même compte pouvait se retrouver assis plusieurs fois à la même table).
+        if (waiting.stream().anyMatch(w -> w.userId() == userId)) {
+            return;
+        }
         session.put("mmRanked", true);
         waiting.add(new Waiting(session, name, userId, ratingService.ratingOf(userId), clock.getAsLong()));
         tryForm();
