@@ -7,12 +7,26 @@ import java.util.Comparator;
 import java.util.List;
 
 public record MontanteState(
-        List<List<Card>> hands, MontanteBoard board, List<Integer> finishingOrder, int passStreak, int currentPlayer)
+        List<List<Card>> hands,
+        MontanteBoard board,
+        List<Integer> finishingOrder,
+        int passStreak,
+        int currentPlayer,
+        boolean aceFollowUp)
         implements RoundState {
 
     public MontanteState {
         hands = TrickTakingState.deepCopy(hands);
         finishingOrder = List.copyOf(finishingOrder);
+    }
+
+    public MontanteState(
+            List<List<Card>> hands,
+            MontanteBoard board,
+            List<Integer> finishingOrder,
+            int passStreak,
+            int currentPlayer) {
+        this(hands, board, finishingOrder, passStreak, currentPlayer, false);
     }
 
     @Override

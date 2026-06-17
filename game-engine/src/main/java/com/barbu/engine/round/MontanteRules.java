@@ -29,6 +29,11 @@ public final class MontanteRules {
                 playable.add(new Move.PlayCard(c));
             }
         }
+        if (state.aceFollowUp()) {
+            // Bonus d'As : le joueur peut enchaîner une carte ou s'arrêter en passant.
+            playable.add(new Move.Pass());
+            return List.copyOf(playable);
+        }
         return playable.isEmpty() ? List.of(new Move.Pass()) : List.copyOf(playable);
     }
 
@@ -44,7 +49,7 @@ public final class MontanteRules {
         MontanteBoard board = state.board();
         List<Integer> finishing = new ArrayList<>(state.finishingOrder());
         int passStreak;
-        boolean replay = false;
+        boolean aceFollowUp = false;
 
         if (move instanceof Move.PlayCard play) {
             board = board.place(play.card());
@@ -55,13 +60,16 @@ public final class MontanteRules {
             }
             passStreak = 0;
             // Poser un As rend la main au même joueur tant qu'il lui reste un coup jouable.
-            replay = play.card().rank() == Rank.ACE && !emptied && canPlayAny(hands.get(seat), board);
+            aceFollowUp = play.card().rank() == Rank.ACE && !emptied && canPlayAny(hands.get(seat), board);
+        } else if (state.aceFollowUp()) {
+            // Renoncer au bonus d'As ne bloque pas la table : une carte vient d'être posée.
+            passStreak = state.passStreak();
         } else {
             passStreak = state.passStreak() + 1;
         }
 
-        int nextPlayer = replay ? seat : nextActive(seat, hands);
-        return new MontanteState(hands, board, finishing, passStreak, nextPlayer);
+        int nextPlayer = aceFollowUp ? seat : nextActive(seat, hands);
+        return new MontanteState(hands, board, finishing, passStreak, nextPlayer, aceFollowUp);
     }
 
     public static Map<Integer, Integer> score(MontanteState state) {

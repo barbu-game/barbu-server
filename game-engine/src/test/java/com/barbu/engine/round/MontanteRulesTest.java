@@ -67,6 +67,58 @@ class MontanteRulesTest {
     }
 
     @Test
+    void ace_follow_up_lets_the_player_pass_instead_of_replaying() {
+        MontanteState s = new MontanteState(
+                List.of(
+                        List.of(c(Suit.HEARTS, Rank.ACE), c(Suit.HEARTS, Rank.SEVEN)),
+                        List.of(c(Suit.CLUBS, Rank.TWO)),
+                        List.of(),
+                        List.of()),
+                openedToKing(Suit.HEARTS),
+                List.of(),
+                0,
+                0);
+        MontanteState afterAce =
+                (MontanteState) MontanteRules.applyMove(s, 0, new Move.PlayCard(c(Suit.HEARTS, Rank.ACE)));
+
+        assertEquals(0, afterAce.currentPlayer(), "the Ace keeps the turn");
+        List<Move> legal = MontanteRules.legalMoves(afterAce, 0);
+        assertTrue(legal.contains(new Move.PlayCard(c(Suit.HEARTS, Rank.SEVEN))), "replaying a card stays available");
+        assertTrue(legal.contains(new Move.Pass()), "passing is offered as an alternative to replaying");
+
+        MontanteState afterPass = (MontanteState) MontanteRules.applyMove(afterAce, 0, new Move.Pass());
+        assertEquals(1, afterPass.currentPlayer(), "declining hands over to the next player");
+        assertEquals(0, afterPass.passStreak(), "a voluntary decline is not a blocking pass");
+    }
+
+    @Test
+    void pass_is_offered_after_chaining_two_aces() {
+        MontanteState s = new MontanteState(
+                List.of(
+                        List.of(c(Suit.HEARTS, Rank.ACE), c(Suit.SPADES, Rank.ACE), c(Suit.HEARTS, Rank.SEVEN)),
+                        List.of(c(Suit.CLUBS, Rank.TWO)),
+                        List.of(),
+                        List.of()),
+                openedToKing(Suit.HEARTS)
+                        .place(c(Suit.SPADES, Rank.EIGHT))
+                        .place(c(Suit.SPADES, Rank.NINE))
+                        .place(c(Suit.SPADES, Rank.TEN))
+                        .place(c(Suit.SPADES, Rank.JACK))
+                        .place(c(Suit.SPADES, Rank.QUEEN))
+                        .place(c(Suit.SPADES, Rank.KING)),
+                List.of(),
+                0,
+                0);
+        MontanteState a1 = (MontanteState) MontanteRules.applyMove(s, 0, new Move.PlayCard(c(Suit.HEARTS, Rank.ACE)));
+        MontanteState a2 = (MontanteState) MontanteRules.applyMove(a1, 0, new Move.PlayCard(c(Suit.SPADES, Rank.ACE)));
+        assertEquals(0, a2.currentPlayer(), "two Aces keep the turn");
+
+        assertTrue(MontanteRules.legalMoves(a2, 0).contains(new Move.Pass()), "pass is offered after the second Ace");
+        MontanteState afterPass = (MontanteState) MontanteRules.applyMove(a2, 0, new Move.Pass());
+        assertEquals(1, afterPass.currentPlayer(), "declining after two Aces hands over to the next player");
+    }
+
+    @Test
     void ace_with_no_remaining_legal_move_ends_the_turn() {
         MontanteState s = new MontanteState(
                 List.of(
