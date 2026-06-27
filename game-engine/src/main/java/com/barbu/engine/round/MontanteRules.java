@@ -59,8 +59,11 @@ public final class MontanteRules {
                 finishing.add(seat);
             }
             passStreak = 0;
-            // Poser un As rend la main au même joueur tant qu'il lui reste un coup jouable.
-            aceFollowUp = play.card().rank() == Rank.ACE && !emptied && canPlayAny(hands.get(seat), board);
+            // Un As ouvre une enchaîne libre : le joueur garde la main et peut poser autant de
+            // cartes qu'il veut, jusqu'à ce qu'il passe ou n'ait plus de coup jouable.
+            aceFollowUp = (play.card().rank() == Rank.ACE || state.aceFollowUp())
+                    && !emptied
+                    && canPlayAny(hands.get(seat), board);
         } else if (state.aceFollowUp()) {
             // Renoncer au bonus d'As ne bloque pas la table : une carte vient d'être posée.
             passStreak = state.passStreak();

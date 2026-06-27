@@ -40,7 +40,7 @@ class MontanteRulesTest {
     }
 
     @Test
-    void ace_replay_chains_through_further_aces_then_ends_on_a_normal_card() {
+    void ace_replay_chains_through_further_aces_until_the_hand_empties() {
         MontanteState s = new MontanteState(
                 List.of(
                         List.of(c(Suit.HEARTS, Rank.ACE), c(Suit.SPADES, Rank.ACE), c(Suit.HEARTS, Rank.SEVEN)),
@@ -63,7 +63,54 @@ class MontanteRulesTest {
         assertEquals(0, a2.currentPlayer(), "second Ace keeps the turn again");
         MontanteState a3 =
                 (MontanteState) MontanteRules.applyMove(a2, 0, new Move.PlayCard(c(Suit.HEARTS, Rank.SEVEN)));
-        assertEquals(1, a3.currentPlayer(), "a normal card ends the turn");
+        assertEquals(1, a3.currentPlayer(), "emptying the hand on the last card hands over");
+    }
+
+    @Test
+    void ace_free_play_continues_across_normal_cards_until_a_pass() {
+        MontanteState s = new MontanteState(
+                List.of(
+                        List.of(c(Suit.HEARTS, Rank.ACE), c(Suit.HEARTS, Rank.SEVEN), c(Suit.HEARTS, Rank.SIX)),
+                        List.of(c(Suit.CLUBS, Rank.TWO)),
+                        List.of(),
+                        List.of()),
+                openedToKing(Suit.HEARTS),
+                List.of(),
+                0,
+                0);
+        MontanteState afterAce =
+                (MontanteState) MontanteRules.applyMove(s, 0, new Move.PlayCard(c(Suit.HEARTS, Rank.ACE)));
+        MontanteState afterSeven =
+                (MontanteState) MontanteRules.applyMove(afterAce, 0, new Move.PlayCard(c(Suit.HEARTS, Rank.SEVEN)));
+        assertEquals(0, afterSeven.currentPlayer(), "a normal card keeps the ace free-play turn");
+
+        List<Move> legal = MontanteRules.legalMoves(afterSeven, 0);
+        assertTrue(legal.contains(new Move.PlayCard(c(Suit.HEARTS, Rank.SIX))), "the next card stays playable");
+        assertTrue(legal.contains(new Move.Pass()), "the player may stop by passing");
+
+        MontanteState afterPass = (MontanteState) MontanteRules.applyMove(afterSeven, 0, new Move.Pass());
+        assertEquals(1, afterPass.currentPlayer(), "passing ends the free-play and hands over");
+        assertEquals(0, afterPass.passStreak(), "ending the free-play is not a blocking pass");
+    }
+
+    @Test
+    void ace_free_play_ends_on_its_own_when_no_playable_card_remains() {
+        MontanteState s = new MontanteState(
+                List.of(
+                        List.of(c(Suit.HEARTS, Rank.ACE), c(Suit.HEARTS, Rank.SEVEN), c(Suit.CLUBS, Rank.TWO)),
+                        List.of(c(Suit.SPADES, Rank.THREE)),
+                        List.of(),
+                        List.of()),
+                openedToKing(Suit.HEARTS),
+                List.of(),
+                0,
+                0);
+        MontanteState afterAce =
+                (MontanteState) MontanteRules.applyMove(s, 0, new Move.PlayCard(c(Suit.HEARTS, Rank.ACE)));
+        MontanteState afterSeven =
+                (MontanteState) MontanteRules.applyMove(afterAce, 0, new Move.PlayCard(c(Suit.HEARTS, Rank.SEVEN)));
+        assertEquals(1, afterSeven.currentPlayer(), "with no playable card left, the free-play turn ends");
+        assertEquals(0, afterSeven.passStreak(), "running out of plays is not a blocking pass");
     }
 
     @Test
