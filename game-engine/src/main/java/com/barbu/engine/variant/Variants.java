@@ -6,6 +6,8 @@ import com.barbu.engine.model.ScoringConfig;
 import com.barbu.engine.scoring.CardPenalty;
 import com.barbu.engine.scoring.CombinedRule;
 import com.barbu.engine.scoring.LastTricksPenalty;
+import com.barbu.engine.scoring.NormalizedCardPenalty;
+import com.barbu.engine.scoring.NormalizedTrickPenalty;
 import com.barbu.engine.scoring.TrickPenalty;
 import com.barbu.engine.scoring.TrickScoringRule;
 import java.util.LinkedHashMap;
@@ -18,8 +20,12 @@ public final class Variants {
     private static final TrickScoringRule TRICKS = new TrickPenalty(ScoringConfig.PER_TRICK);
     private static final TrickScoringRule HEARTS = new CardPenalty(Card::isHeart, ScoringConfig.PER_HEART, "heart");
     private static final TrickScoringRule QUEENS = new CardPenalty(Card::isQueen, ScoringConfig.PER_QUEEN, "queen");
-    private static final TrickScoringRule RED_KINGS =
-            new CardPenalty(Card::isRedKing, ScoringConfig.PER_RED_KING, "red king");
+
+    // The five-contract table normalises every contract to the same per-round total (spec §2.4).
+    private static final TrickScoringRule TRICKS_60 = new NormalizedTrickPenalty();
+    private static final TrickScoringRule HEARTS_60 = new NormalizedCardPenalty(Card::isHeart, "heart");
+    private static final TrickScoringRule QUEENS_60 = new NormalizedCardPenalty(Card::isQueen, "queen");
+    private static final TrickScoringRule RED_KINGS_60 = new NormalizedCardPenalty(Card::isRedKing, "red king");
     private static final TrickScoringRule KING_OF_HEARTS =
             new CardPenalty(Card::isKingOfHearts, ScoringConfig.PER_KING_OF_HEARTS, "King of Hearts");
     private static final TrickScoringRule JACKS = new CardPenalty(Card::isJack, ScoringConfig.PER_JACK, "Jack");
@@ -40,10 +46,10 @@ public final class Variants {
                     Contract.NO_RED_KINGS,
                     Contract.MONTANTE),
             ruleMap(
-                    Map.entry(Contract.NO_TRICKS, TRICKS),
-                    Map.entry(Contract.NO_HEARTS, HEARTS),
-                    Map.entry(Contract.NO_QUEENS, QUEENS),
-                    Map.entry(Contract.NO_RED_KINGS, RED_KINGS)));
+                    Map.entry(Contract.NO_TRICKS, TRICKS_60),
+                    Map.entry(Contract.NO_HEARTS, HEARTS_60),
+                    Map.entry(Contract.NO_QUEENS, QUEENS_60),
+                    Map.entry(Contract.NO_RED_KINGS, RED_KINGS_60)));
 
     public static final Variant CLASSIC = new Variant(
             "classic",

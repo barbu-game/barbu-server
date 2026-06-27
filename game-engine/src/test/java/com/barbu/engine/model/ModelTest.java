@@ -43,7 +43,29 @@ class ModelTest {
                 assertTrue(ranking[p] < ranking[p - 1], "n=" + n + " not strictly descending");
             }
         }
-        assertArrayEquals(new int[] {15, 5, -5, -15}, ScoringConfig.montanteRanking(4));
+        assertArrayEquals(new int[] {30, 15, 0, -15, -30}, ScoringConfig.montanteRanking(5));
+        assertArrayEquals(new int[] {30, 10, -10, -30}, ScoringConfig.montanteRanking(4));
+        assertArrayEquals(new int[] {30, -30}, ScoringConfig.montanteRanking(2));
+    }
+
+    @Test
+    void distribute_splits_the_total_evenly_with_a_uniformly_spread_remainder() {
+        assertArrayEquals(new int[] {15, 15, 15, 15}, ScoringConfig.distribute(60, 4));
+        assertArrayEquals(new int[] {30, 30}, ScoringConfig.distribute(60, 2));
+        for (int units = 1; units <= 26; units++) {
+            int[] shares = ScoringConfig.distribute(60, units);
+            assertEquals(units, shares.length, "units=" + units);
+            int sum = 0;
+            int min = shares[0];
+            int max = shares[0];
+            for (int s : shares) {
+                sum += s;
+                min = Math.min(min, s);
+                max = Math.max(max, s);
+            }
+            assertEquals(60, sum, "units=" + units + " must sum to the full total");
+            assertTrue(max - min <= 1, "units=" + units + " shares must differ by at most one");
+        }
     }
 
     @Test

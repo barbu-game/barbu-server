@@ -42,11 +42,9 @@ class RoundInvariantsTest {
     }
 
     @Property
-    void no_tricks_total_equals_minus_two_per_trick(
+    void no_tricks_hands_out_exactly_sixty_points(
             @ForAll @IntRange(min = 2, max = 10) int n, @ForAll @LongRange(min = 0, max = 400) long seed) {
-        List<List<Card>> hands = deal(n, seed);
-        int tricks = hands.get(0).size();
-        RoundState s = RoundEngine.startTrickTaking(Contract.NO_TRICKS, hands, 1);
+        RoundState s = RoundEngine.startTrickTaking(Contract.NO_TRICKS, deal(n, seed), 1);
         while (!s.isComplete()) {
             s = RoundEngine.applyMove(
                     s,
@@ -57,7 +55,7 @@ class RoundInvariantsTest {
         for (int p : MatchEngine.scoreRound(Variants.DEVELOPER, s).points()) {
             total += p;
         }
-        assertEquals(-2 * tricks, total, "n=" + n + " seed=" + seed);
+        assertEquals(-60, total, "n=" + n + " seed=" + seed);
     }
 
     @Property

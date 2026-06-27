@@ -1,6 +1,7 @@
 package com.barbu.engine.scoring;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -52,6 +53,50 @@ class ScoringRulesTest {
         assertArrayEquals(new int[] {-4, -2, -2}, rule.score(o));
         assertTrue(rule.describe().contains("trick"));
         assertTrue(rule.describe().contains("heart"));
+    }
+
+    @Test
+    void normalized_card_penalty_hands_out_exactly_sixty_over_the_matching_cards() {
+        TrickOutcome o = new TrickOutcome(
+                List.of(
+                        List.of(c(Suit.SPADES, Rank.QUEEN), c(Suit.HEARTS, Rank.QUEEN)),
+                        List.of(c(Suit.DIAMONDS, Rank.QUEEN)),
+                        List.of(c(Suit.CLUBS, Rank.QUEEN))),
+                List.of(0, 1, 2),
+                3);
+        TrickScoringRule rule = new NormalizedCardPenalty(Card::isQueen, "queen");
+        int[] points = rule.score(o);
+        assertArrayEquals(new int[] {-30, -15, -15}, points);
+        assertEquals(-60, points[0] + points[1] + points[2]);
+    }
+
+    @Test
+    void normalized_card_penalty_totals_sixty_even_when_the_count_does_not_divide_it() {
+        // 13 hearts, all captured by one seat: 60 is not divisible by 13, yet the total is exact.
+        List<Card> allHearts = new java.util.ArrayList<>();
+        for (Rank r : Rank.values()) {
+            allHearts.add(c(Suit.HEARTS, r));
+        }
+        TrickOutcome o = new TrickOutcome(List.of(allHearts, List.of()), List.of(0), 2);
+        TrickScoringRule rule = new NormalizedCardPenalty(Card::isHeart, "heart");
+        int[] points = rule.score(o);
+        assertArrayEquals(new int[] {-60, 0}, points);
+    }
+
+    @Test
+    void normalized_trick_penalty_hands_out_exactly_sixty_over_the_tricks() {
+        TrickOutcome o =
+                new TrickOutcome(List.of(List.of(), List.of(), List.of()), List.of(0, 0, 1, 1, 2, 2, 0, 1, 2, 0), 3);
+        TrickScoringRule rule = new NormalizedTrickPenalty();
+        int[] points = rule.score(o);
+        assertEquals(-60, points[0] + points[1] + points[2]);
+    }
+
+    @Test
+    void normalized_trick_penalty_charges_sixty_to_a_lone_taker() {
+        TrickOutcome o = new TrickOutcome(List.of(List.of(), List.of()), List.of(0, 0, 0, 0, 0), 2);
+        TrickScoringRule rule = new NormalizedTrickPenalty();
+        assertArrayEquals(new int[] {-60, 0}, rule.score(o));
     }
 
     @Test

@@ -135,7 +135,7 @@ class MatchEngineTest {
         MatchState settled = MatchEngine.settle(matchWith(round));
         assertNull(settled.round());
         assertEquals(1, settled.roundNumber());
-        assertEquals(2 * ScoringConfig.PER_RED_KING, settled.totals()[0]);
+        assertEquals(-ScoringConfig.POINTS_PER_ROUND, settled.totals()[0]);
         assertEquals(0, settled.totals()[1]);
     }
 
@@ -148,7 +148,7 @@ class MatchEngineTest {
         m = MatchEngine.applyMove(m, 0, new Move.PlayCard(c(Suit.HEARTS, Rank.KING)));
         m = MatchEngine.applyMove(m, 1, new Move.PlayCard(c(Suit.DIAMONDS, Rank.KING)));
         assertNull(m.round(), "both red kings captured, so the round settles without playing the spades");
-        assertEquals(2 * ScoringConfig.PER_RED_KING, m.totals()[0]);
+        assertEquals(-ScoringConfig.POINTS_PER_ROUND, m.totals()[0]);
         assertEquals(0, m.totals()[1]);
     }
 }

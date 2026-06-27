@@ -15,14 +15,41 @@ public final class ScoringConfig {
     public static final int PER_JACK = -2;
     public static final int PER_LAST_TRICK = -10;
 
-    public static final int MONTANTE_STEP = 5;
+    /** Every penalty contract hands out exactly this many points, spread over its scoring units. */
+    public static final int POINTS_PER_ROUND = 60;
 
-    /** {@code n} zero-sum places, linear and symmetric: place p gets (n-1-2p) * step. */
+    public static final int MONTANTE_TOP = 30;
+
+    /**
+     * {@code n} zero-sum places, linearly interpolated from {@code +MONTANTE_TOP} (first) to
+     * {@code -MONTANTE_TOP} (last). Mirrored around the centre so the sum is always zero.
+     */
     public static int[] montanteRanking(int n) {
         int[] ranking = new int[n];
-        for (int p = 0; p < n; p++) {
-            ranking[p] = (n - 1 - 2 * p) * MONTANTE_STEP;
+        for (int p = 0; 2 * p < n; p++) {
+            int value = Math.round((float) MONTANTE_TOP * (n - 1 - 2 * p) / (n - 1));
+            ranking[p] = value;
+            ranking[n - 1 - p] = -value;
         }
         return ranking;
+    }
+
+    /**
+     * Split {@code total} into {@code units} integer shares that sum to exactly {@code total},
+     * each {@code floor(total/units)} or one more, with the remainder spread as evenly as
+     * possible across the units (so no run of units is favoured over another).
+     */
+    public static int[] distribute(int total, int units) {
+        if (units <= 0) {
+            return new int[0];
+        }
+        int base = total / units;
+        int remainder = total % units;
+        int[] shares = new int[units];
+        for (int i = 0; i < units; i++) {
+            int extra = ((i + 1) * remainder) / units - (i * remainder) / units;
+            shares[i] = base + extra;
+        }
+        return shares;
     }
 }

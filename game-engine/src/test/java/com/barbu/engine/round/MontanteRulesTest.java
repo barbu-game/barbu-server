@@ -271,10 +271,10 @@ class MontanteRulesTest {
                 0,
                 1);
         Map<Integer, Integer> s4 = MontanteRules.score(four);
-        assertEquals(15, s4.get(2));
-        assertEquals(5, s4.get(0));
-        assertEquals(-5, s4.get(3));
-        assertEquals(-15, s4.get(1));
+        assertEquals(30, s4.get(2));
+        assertEquals(10, s4.get(0));
+        assertEquals(-10, s4.get(3));
+        assertEquals(-30, s4.get(1));
 
         MontanteState three = new MontanteState(
                 List.of(List.of(), List.of(c(Suit.CLUBS, Rank.TWO)), List.of()),
@@ -283,8 +283,8 @@ class MontanteRulesTest {
                 0,
                 1);
         Map<Integer, Integer> s3 = MontanteRules.score(three);
-        assertEquals(10, s3.get(0));
+        assertEquals(30, s3.get(0));
         assertEquals(0, s3.get(2));
-        assertEquals(-10, s3.get(1));
+        assertEquals(-30, s3.get(1));
     }
 }
