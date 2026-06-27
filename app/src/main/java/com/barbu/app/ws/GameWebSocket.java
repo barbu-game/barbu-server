@@ -186,6 +186,7 @@ public class GameWebSocket {
         if (room != null) {
             room.handleDisconnect(seat);
             if (room.isEmptyOfHumans()) {
+                room.recordAbandonmentForfeit();
                 rooms.remove(roomId);
             }
         }

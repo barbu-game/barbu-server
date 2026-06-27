@@ -10,6 +10,7 @@ import com.barbu.bot.HeuristicBot;
 import com.barbu.engine.card.Card;
 import com.barbu.engine.match.MatchEngine;
 import com.barbu.engine.match.MatchState;
+import com.barbu.engine.model.DefaultMove;
 import com.barbu.engine.model.Move;
 import com.barbu.engine.round.MontanteState;
 import com.barbu.engine.round.RoundEngine;
@@ -72,6 +73,14 @@ public final class GameRoom {
     private Boolean[] votes;
     private ScheduledFuture<?> voteTimeout;
 
+    private ScheduledFuture<?> turnTimeout;
+    private int turnTimeoutSeat = -1;
+    private long turnDeadlineEpochMs;
+    private final long turnTimeoutMs;
+    private final int turnTimeoutStrikes;
+    private final int[] strikes;
+    private final boolean[] abandoned;
+
     GameRoom(
             String id,
             int playerCount,
@@ -81,7 +90,20 @@ public final class GameRoom {
             long botDelayMs,
             MatchRecorder recorder,
             com.barbu.app.metrics.GameMetrics metrics) {
-        this(id, playerCount, variant, mapper, scheduler, botDelayMs, recorder, metrics, "private", null, null);
+        this(
+                id,
+                playerCount,
+                variant,
+                mapper,
+                scheduler,
+                botDelayMs,
+                recorder,
+                metrics,
+                "private",
+                null,
+                null,
+                60000,
+                2);
     }
 
     GameRoom(
@@ -95,7 +117,9 @@ public final class GameRoom {
             com.barbu.app.metrics.GameMetrics metrics,
             String mode,
             RatingService ratingService,
-            ReconnectIndex reconnectIndex) {
+            ReconnectIndex reconnectIndex,
+            long turnTimeoutMs,
+            int turnTimeoutStrikes) {
         this.id = id;
         this.playerCount = playerCount;
         this.variant = variant;
@@ -107,12 +131,16 @@ public final class GameRoom {
         this.mode = mode;
         this.ratingService = ratingService;
         this.reconnectIndex = reconnectIndex;
+        this.turnTimeoutMs = turnTimeoutMs;
+        this.turnTimeoutStrikes = turnTimeoutStrikes;
         this.names = new String[playerCount];
         this.isBot = new boolean[playerCount];
         this.userIds = new Long[playerCount];
         this.sessions = new WebSocketSession[playerCount];
         this.lastChatAt = new long[playerCount];
         this.resumeTokens = new String[playerCount];
+        this.strikes = new int[playerCount];
+        this.abandoned = new boolean[playerCount];
     }
 
     public String id() {
@@ -190,6 +218,8 @@ public final class GameRoom {
                 || isBot[seat]) {
             return;
         }
+        strikes[seat] = 0;
+        cancelTurnTimer();
         match = MatchEngine.applyMoveNoSettle(match, seat, move);
         afterAdvance();
     }
@@ -277,16 +307,17 @@ public final class GameRoom {
         return Optional.of(new ChatBroadcast(seat, name, clean, now));
     }
 
-    /** A human left: hand their seat to a bot so the table keeps playing (spec §5.5). */
+    /**
+     * A human left: the seat stays human but flagged disconnected. The turn timeout drives play and
+     * hands the seat to a bot only after the configured strikes, so a quick reconnect can reclaim it.
+     */
     public synchronized void handleDisconnect(int seat) {
         if (seat < 0 || seat >= playerCount) {
             return;
         }
         sessions[seat] = null;
         if (match != null) {
-            isBot[seat] = true;
             broadcast();
-            scheduleBotsIfNeeded();
         }
     }
 
@@ -305,6 +336,8 @@ public final class GameRoom {
         }
         sessions[seat] = session;
         isBot[seat] = false;
+        abandoned[seat] = false;
+        strikes[seat] = 0;
         broadcast();
         return seat;
     }
@@ -349,7 +382,7 @@ public final class GameRoom {
             // Pause on an empty table so the round-switch recap can be shown before the next deal.
             scheduler.schedule(this::startContractStep, roundSwitchPauseMs(), TimeUnit.MILLISECONDS);
         } else {
-            scheduleBotsIfNeeded();
+            scheduleActor();
         }
     }
 
@@ -359,7 +392,7 @@ public final class GameRoom {
         }
         match = MatchEngine.startNextContract(match);
         broadcast();
-        scheduleBotsIfNeeded();
+        scheduleActor();
     }
 
     private void afterAdvance() {
@@ -385,7 +418,7 @@ public final class GameRoom {
         trickResolving = false;
         match = MatchEngine.collectTrick(match);
         broadcast();
-        scheduleBotsIfNeeded();
+        scheduleActor();
     }
 
     private synchronized void settleStep() {
@@ -497,6 +530,61 @@ public final class GameRoom {
         }
     }
 
+    /** Hand control to whoever must act next: a bot move, or a human turn under timeout. */
+    private void scheduleActor() {
+        cancelTurnTimer();
+        if (currentActorIsBot()) {
+            scheduler.schedule(this::botStep, botDelayMs, TimeUnit.MILLISECONDS);
+        } else {
+            armTurnTimer();
+        }
+    }
+
+    private void armTurnTimer() {
+        if (stopped || voteOpen || trickResolving || match == null) {
+            return;
+        }
+        RoundState round = match.round();
+        if (round == null || MatchEngine.isComplete(match)) {
+            return;
+        }
+        int seat = round.currentPlayer();
+        if (isBot[seat]) {
+            return;
+        }
+        turnTimeoutSeat = seat;
+        turnDeadlineEpochMs = System.currentTimeMillis() + turnTimeoutMs;
+        turnTimeout = scheduler.schedule(() -> onTurnTimeout(seat), turnTimeoutMs, TimeUnit.MILLISECONDS);
+    }
+
+    private void cancelTurnTimer() {
+        if (turnTimeout != null) {
+            turnTimeout.cancel(false);
+            turnTimeout = null;
+        }
+        turnTimeoutSeat = -1;
+        turnDeadlineEpochMs = 0;
+    }
+
+    private synchronized void onTurnTimeout(int seat) {
+        RoundState round = match == null ? null : match.round();
+        if (stopped
+                || voteOpen
+                || trickResolving
+                || round == null
+                || MatchEngine.isComplete(match)
+                || round.currentPlayer() != seat
+                || isBot[seat]) {
+            return;
+        }
+        match = MatchEngine.applyMoveNoSettle(match, seat, DefaultMove.pick(RoundEngine.legalMoves(round, seat)));
+        if (++strikes[seat] >= turnTimeoutStrikes) {
+            isBot[seat] = true;
+            abandoned[seat] = true;
+        }
+        afterAdvance();
+    }
+
     private synchronized void botStep() {
         if (!currentActorIsBot()) {
             return;
@@ -574,16 +662,67 @@ public final class GameRoom {
 
         if (ratingService != null && "ranked".equals(mode) && MatchEngine.isComplete(match)) {
             try {
-                List<Integer> standings = MatchEngine.standings(match);
-                List<RatingService.SeatRating> seats = new ArrayList<>(playerCount);
-                for (int seat = 0; seat < playerCount; seat++) {
-                    int rank = standings.indexOf(seat) + 1;
-                    seats.add(new RatingService.SeatRating(seat, userIds[seat], isBot[seat], rank));
-                }
-                broadcastRankedResult(ratingService.applyRankedResult(seats));
+                broadcastRankedResult(ratingService.applyRankedResult(eloSeats()));
             } catch (Exception ignored) {
                 // l'ELO est best-effort : un échec ne doit pas interrompre la fin de partie
             }
+        }
+    }
+
+    /**
+     * Place chaque siège non abandonné selon l'ordre de classement (score), puis range tous les
+     * abandonnés à la même dernière place ex æquo — « un partant a forcément perdu ».
+     */
+    static int[] placementsForElo(List<Integer> standingsOrder, boolean[] abandonedForElo) {
+        int[] placement = new int[abandonedForElo.length];
+        int pos = 1;
+        for (int seat : standingsOrder) {
+            if (!abandonedForElo[seat]) {
+                placement[seat] = pos++;
+            }
+        }
+        for (int seat = 0; seat < abandonedForElo.length; seat++) {
+            if (abandonedForElo[seat]) {
+                placement[seat] = pos;
+            }
+        }
+        return placement;
+    }
+
+    /** Un compte humain exclu (strikes) ou déconnecté est traité comme un partant pour l'ELO. */
+    private boolean[] abandonedForElo() {
+        boolean[] flags = new boolean[playerCount];
+        for (int seat = 0; seat < playerCount; seat++) {
+            flags[seat] = userIds[seat] != null && (abandoned[seat] || sessions[seat] == null);
+        }
+        return flags;
+    }
+
+    private List<RatingService.SeatRating> eloSeats() {
+        boolean[] abandonedForElo = abandonedForElo();
+        int[] placement = placementsForElo(MatchEngine.standings(match), abandonedForElo);
+        List<RatingService.SeatRating> seats = new ArrayList<>(playerCount);
+        for (int seat = 0; seat < playerCount; seat++) {
+            boolean botForElo = isBot[seat] && !abandonedForElo[seat];
+            seats.add(new RatingService.SeatRating(seat, userIds[seat], botForElo, placement[seat]));
+        }
+        return seats;
+    }
+
+    /**
+     * Partie ranked annulée parce que plus aucun humain n'est connecté : avant de fermer la room,
+     * on applique le malus ELO (partants forcés en dernier). Best-effort, idempotent via {@code recorded}.
+     */
+    public synchronized void recordAbandonmentForfeit() {
+        cancelTurnTimer();
+        if (ratingService == null || !"ranked".equals(mode) || match == null || recorded) {
+            return;
+        }
+        recorded = true;
+        try {
+            broadcastRankedResult(ratingService.applyRankedResult(eloSeats()));
+        } catch (Exception ignored) {
+            // best-effort : l'échec d'enregistrement ne doit pas bloquer la fermeture de la room
         }
     }
 
@@ -650,6 +789,9 @@ public final class GameRoom {
         }
 
         view.put("currentActor", round.currentPlayer());
+        if (turnDeadlineEpochMs > 0 && round.currentPlayer() == turnTimeoutSeat) {
+            view.put("turnDeadlineEpochMs", turnDeadlineEpochMs);
+        }
         view.put("contract", round.contract().name());
         view.put("handCounts", handCounts(round));
         view.put("yourHand", handMaps(handsOf(round).get(seat)));

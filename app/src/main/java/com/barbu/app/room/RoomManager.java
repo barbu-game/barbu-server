@@ -25,6 +25,8 @@ public class RoomManager {
     private final RatingService ratingService;
     private final ReconnectIndex reconnectIndex;
     private final long botDelayMs;
+    private final long turnTimeoutMs;
+    private final int turnTimeoutStrikes;
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
     private final Random random = new Random();
 
@@ -34,13 +36,17 @@ public class RoomManager {
             com.barbu.app.metrics.GameMetrics metrics,
             RatingService ratingService,
             ReconnectIndex reconnectIndex,
-            @Value("${barbu.bot-delay-ms:650}") long botDelayMs) {
+            @Value("${barbu.bot-delay-ms:650}") long botDelayMs,
+            @Value("${barbu.turn-timeout-ms:60000}") long turnTimeoutMs,
+            @Value("${barbu.turn-timeout-strikes:2}") int turnTimeoutStrikes) {
         this.mapper = mapper;
         this.recorder = recorder;
         this.metrics = metrics;
         this.ratingService = ratingService;
         this.reconnectIndex = reconnectIndex;
         this.botDelayMs = botDelayMs;
+        this.turnTimeoutMs = turnTimeoutMs;
+        this.turnTimeoutStrikes = turnTimeoutStrikes;
     }
 
     public GameRoom create(int requestedPlayerCount, Variant variant) {
@@ -61,7 +67,9 @@ public class RoomManager {
                 metrics,
                 mode,
                 ratingService,
-                reconnectIndex);
+                reconnectIndex,
+                turnTimeoutMs,
+                turnTimeoutStrikes);
         rooms.put(id, room);
         return room;
     }
