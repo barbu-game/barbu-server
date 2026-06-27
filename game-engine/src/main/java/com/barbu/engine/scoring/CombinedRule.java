@@ -19,6 +19,19 @@ public record CombinedRule(List<TrickScoringRule> rules) implements TrickScoring
         return points;
     }
 
+    /** Term-by-term sum of each component's running score. */
+    @Override
+    public int[] runningScore(TrickOutcome captured, List<List<Card>> remainingHands) {
+        int[] points = new int[captured.playerCount()];
+        for (TrickScoringRule rule : rules) {
+            int[] partial = rule.runningScore(captured, remainingHands);
+            for (int seat = 0; seat < points.length; seat++) {
+                points[seat] += partial[seat];
+            }
+        }
+        return points;
+    }
+
     @Override
     public String describe() {
         return rules.stream().map(TrickScoringRule::describe).collect(Collectors.joining("; "));

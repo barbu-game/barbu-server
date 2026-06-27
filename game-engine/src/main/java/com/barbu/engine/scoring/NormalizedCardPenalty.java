@@ -22,19 +22,32 @@ public record NormalizedCardPenalty(Predicate<Card> match, String label) impleme
 
     @Override
     public int[] score(TrickOutcome outcome) {
-        List<Card> matching = new ArrayList<>();
-        for (List<Card> seatCards : outcome.capturedPerSeat()) {
-            for (Card card : seatCards) {
-                if (match.test(card)) {
-                    matching.add(card);
-                }
-            }
-        }
-        matching.sort(CANONICAL);
-        int[] shares = ScoringConfig.distribute(ScoringConfig.POINTS_PER_ROUND, matching.size());
+        return spreadOver(outcome, List.of());
+    }
+
+    /**
+     * The captured cards keep the share they will carry at the end of the round: the total is spread
+     * over every matching card in play (those captured plus the ones still in {@code remainingHands}),
+     * so a seat's running penalty only grows and lands on its final value once the hands are empty.
+     */
+    @Override
+    public int[] runningScore(TrickOutcome captured, List<List<Card>> remainingHands) {
+        return spreadOver(captured, remainingHands);
+    }
+
+    /**
+     * Penalize the captured matching cards, spreading the total over the captured ones plus every
+     * matching card still held in {@code extraHands} (empty for the final score).
+     */
+    private int[] spreadOver(TrickOutcome outcome, List<List<Card>> extraHands) {
+        List<Card> universe = new ArrayList<>();
+        collectMatching(outcome.capturedPerSeat(), universe);
+        collectMatching(extraHands, universe);
+        universe.sort(CANONICAL);
+        int[] shares = ScoringConfig.distribute(ScoringConfig.POINTS_PER_ROUND, universe.size());
         Map<Card, Integer> penaltyByCard = new HashMap<>();
-        for (int i = 0; i < matching.size(); i++) {
-            penaltyByCard.put(matching.get(i), -shares[i]);
+        for (int i = 0; i < universe.size(); i++) {
+            penaltyByCard.put(universe.get(i), -shares[i]);
         }
 
         int[] points = new int[outcome.playerCount()];
@@ -48,6 +61,16 @@ public record NormalizedCardPenalty(Predicate<Card> match, String label) impleme
             points[seat] = total;
         }
         return points;
+    }
+
+    private void collectMatching(List<List<Card>> hands, List<Card> into) {
+        for (List<Card> hand : hands) {
+            for (Card card : hand) {
+                if (match.test(card)) {
+                    into.add(card);
+                }
+            }
+        }
     }
 
     @Override

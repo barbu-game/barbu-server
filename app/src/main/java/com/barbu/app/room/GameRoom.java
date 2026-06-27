@@ -801,7 +801,7 @@ public final class GameRoom {
             int[] running = match.variant()
                     .trickRules()
                     .get(t.contract())
-                    .score(new TrickOutcome(t.captured(), t.trickTakers(), playerCount));
+                    .runningScore(new TrickOutcome(t.captured(), t.trickTakers(), playerCount), notYetCaptured(t));
             List<Integer> roundScores = new ArrayList<>();
             for (int s = 0; s < playerCount; s++) {
                 roundScores.add(running[s]);
@@ -821,6 +821,25 @@ public final class GameRoom {
             view.put("yourLegalMoves", moves);
         }
         return view;
+    }
+
+    /**
+     * Every card not yet in a captured pile, grouped by seat: each hand plus the card that seat has
+     * already laid into the in-progress trick. Restoring those laid cards keeps each seat's count at
+     * its true remaining-tricks value and exposes every still-uncaptured penalty card, so the running
+     * score spreads each contract's points over the round's full unit count rather than flickering as
+     * the current trick fills and resolves.
+     */
+    private static List<List<Card>> notYetCaptured(TrickTakingState t) {
+        List<List<Card>> remaining = new ArrayList<>();
+        for (List<Card> hand : t.hands()) {
+            remaining.add(new ArrayList<>(hand));
+        }
+        Trick trick = t.currentTrick();
+        for (int i = 0; i < trick.cards().size(); i++) {
+            remaining.get(trick.playerAt(i)).add(trick.cards().get(i));
+        }
+        return remaining;
     }
 
     private String phase() {

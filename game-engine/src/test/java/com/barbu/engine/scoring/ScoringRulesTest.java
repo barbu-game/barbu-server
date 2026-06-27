@@ -100,6 +100,68 @@ class ScoringRulesTest {
     }
 
     @Test
+    void running_trick_penalty_shows_the_locked_in_minimum_not_the_lone_taker_maximum() {
+        // One trick taken by seat 0; four tricks still to come (4 cards left in each hand).
+        // Locked-in view spreads 60 over all 5 tricks → -12, not the -60 the captured-only view shows.
+        TrickOutcome captured = new TrickOutcome(List.of(List.of(), List.of()), List.of(0), 2);
+        List<List<Card>> remaining = List.of(
+                List.of(
+                        c(Suit.SPADES, Rank.TWO),
+                        c(Suit.SPADES, Rank.THREE),
+                        c(Suit.SPADES, Rank.FOUR),
+                        c(Suit.SPADES, Rank.FIVE)),
+                List.of(
+                        c(Suit.CLUBS, Rank.TWO),
+                        c(Suit.CLUBS, Rank.THREE),
+                        c(Suit.CLUBS, Rank.FOUR),
+                        c(Suit.CLUBS, Rank.FIVE)));
+        TrickScoringRule rule = new NormalizedTrickPenalty();
+        assertArrayEquals(new int[] {-12, 0}, rule.runningScore(captured, remaining));
+    }
+
+    @Test
+    void running_trick_penalty_equals_final_score_once_the_round_is_over() {
+        TrickOutcome full = new TrickOutcome(List.of(List.of(), List.of()), List.of(0, 0, 0, 0, 0), 2);
+        TrickScoringRule rule = new NormalizedTrickPenalty();
+        List<List<Card>> empty = List.of(List.of(), List.of());
+        assertArrayEquals(rule.score(full), rule.runningScore(full, empty));
+        assertArrayEquals(new int[] {-60, 0}, rule.runningScore(full, empty));
+    }
+
+    @Test
+    void running_card_penalty_spreads_over_every_matching_card_in_play_not_only_those_captured() {
+        // Two queens captured by seat 0, two still in hands. The locked-in view spreads 60 over all
+        // four queens → -30, not the -60 a captured-only view would charge for two-of-two so far.
+        TrickOutcome captured = new TrickOutcome(
+                List.of(List.of(c(Suit.SPADES, Rank.QUEEN), c(Suit.HEARTS, Rank.QUEEN)), List.of()), List.of(0, 0), 2);
+        List<List<Card>> remaining = List.of(List.of(c(Suit.DIAMONDS, Rank.QUEEN)), List.of(c(Suit.CLUBS, Rank.QUEEN)));
+        TrickScoringRule rule = new NormalizedCardPenalty(Card::isQueen, "queen");
+        assertArrayEquals(new int[] {-30, 0}, rule.runningScore(captured, remaining));
+    }
+
+    @Test
+    void running_score_defaults_to_final_score_for_legacy_rules() {
+        TrickOutcome o = new TrickOutcome(List.of(List.of(), List.of(), List.of()), List.of(0, 0, 2), 3);
+        List<List<Card>> remaining = List.of(List.of(c(Suit.SPADES, Rank.TWO)), List.of(), List.of());
+        TrickScoringRule rule = new TrickPenalty(-2);
+        assertArrayEquals(rule.score(o), rule.runningScore(o, remaining));
+    }
+
+    @Test
+    void running_combined_rule_sums_the_running_score_of_each_component() {
+        TrickOutcome captured =
+                new TrickOutcome(List.of(List.of(c(Suit.HEARTS, Rank.QUEEN)), List.of()), List.of(0), 2);
+        List<List<Card>> remaining = List.of(
+                List.of(c(Suit.SPADES, Rank.QUEEN), c(Suit.SPADES, Rank.TWO)),
+                List.of(c(Suit.DIAMONDS, Rank.QUEEN), c(Suit.CLUBS, Rank.TWO)));
+        TrickScoringRule rule = new CombinedRule(
+                List.of(new NormalizedTrickPenalty(), new NormalizedCardPenalty(Card::isQueen, "queen")));
+        int[] running = rule.runningScore(captured, remaining);
+        // 3 tricks total → trick 0 worth -20 to seat 0; 3 queens total → seat 0's one queen worth -20.
+        assertArrayEquals(new int[] {-40, 0}, running);
+    }
+
+    @Test
     void card_penalty_is_exhausted_once_no_matching_card_remains_in_hand() {
         TrickScoringRule rule = new CardPenalty(Card::isRedKing, -10, "red king");
         List<List<Card>> hands = List.of(
