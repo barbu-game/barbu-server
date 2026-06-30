@@ -53,6 +53,9 @@ public final class GameRoom {
 
     private static final long VOTE_TIMEOUT_MS = 15000;
 
+    private static final long PAUSE_VOTE_TIMEOUT_MS = 15000;
+    private static final long PAUSE_DURATION_MS = 60000;
+
     private static final int MAX_CHAT_LEN = 280;
     private static final long CHAT_MIN_INTERVAL_MS = 500;
 
@@ -72,6 +75,12 @@ public final class GameRoom {
     private boolean voteOpen;
     private Boolean[] votes;
     private ScheduledFuture<?> voteTimeout;
+    private boolean pauseVoteOpen;
+    private Boolean[] pauseVotes;
+    private ScheduledFuture<?> pauseVoteTimeout;
+    private boolean paused;
+    private long pauseEndsAtMs;
+    private ScheduledFuture<?> pauseEnd;
 
     private ScheduledFuture<?> turnTimeout;
     private int turnTimeoutSeat = -1;
@@ -230,11 +239,42 @@ public final class GameRoom {
             return;
         }
         votes[seat] = stop;
-        if (allHumansVoted()) {
+        if (allHumansVoted(votes)) {
             resolveVote();
         } else {
             broadcast();
         }
+    }
+
+    /**
+     * Un humain tape {@code /pause}. Le premier appel valide ouvre le vote (à une frontière
+     * entre manches uniquement) ; les suivants enregistrent les votes. Majorité stricte requise.
+     */
+    public synchronized void castPauseVote(int seat, boolean pause) {
+        if (seat < 0 || seat >= playerCount || isBot[seat]) {
+            return;
+        }
+        if (!pauseVoteOpen) {
+            if (!pauseEligible()) {
+                return;
+            }
+            openPauseVote(seat);
+        }
+        pauseVotes[seat] = pause;
+        if (allHumansVoted(pauseVotes)) {
+            resolvePauseVote();
+        } else {
+            broadcast();
+        }
+    }
+
+    /** Un humain tape {@code /resume} : reprise anticipée si une pause est active. */
+    public synchronized void resumeGame(int seat) {
+        if (!paused || seat < 0 || seat >= playerCount || isBot[seat]) {
+            return;
+        }
+        broadcastChat(seat, names[seat] + " relance la partie");
+        endPause();
     }
 
     /** Un humain attablé écrit dans le tchat de table. Diffusé à tous, jamais persisté. */
@@ -260,6 +300,23 @@ public final class GameRoom {
 
     static boolean stopVotePasses(int stopVotes, int humans) {
         return stopVotes * 2 > humans;
+    }
+
+    /**
+     * Éligibilité pure d'un vote de pause, sans état de room : autorisé seulement à une frontière
+     * entre manches (jamais en plein pli), si aucun autre vote/pause n'est en cours et qu'au moins
+     * un humain est attablé. {@code matchActive} = partie démarrée et non terminée ;
+     * {@code betweenRounds} = {@code match.round() == null}.
+     */
+    static boolean pauseAllowed(
+            boolean stopped,
+            boolean stopVoteOpen,
+            boolean pauseVoteOpen,
+            boolean paused,
+            boolean matchActive,
+            boolean betweenRounds,
+            int humans) {
+        return !stopped && !stopVoteOpen && !pauseVoteOpen && !paused && matchActive && betweenRounds && humans > 0;
     }
 
     /**
@@ -375,7 +432,7 @@ public final class GameRoom {
 
     /** Drive the table forward: open the next imposed contract, or let a waiting bot act. */
     private void resume() {
-        if (stopped || voteOpen || match == null || MatchEngine.isComplete(match)) {
+        if (stopped || voteOpen || pauseVoteOpen || paused || match == null || MatchEngine.isComplete(match)) {
             return;
         }
         if (match.round() == null) {
@@ -387,7 +444,13 @@ public final class GameRoom {
     }
 
     private synchronized void startContractStep() {
-        if (stopped || voteOpen || match == null || match.round() != null || MatchEngine.isComplete(match)) {
+        if (stopped
+                || voteOpen
+                || pauseVoteOpen
+                || paused
+                || match == null
+                || match.round() != null
+                || MatchEngine.isComplete(match)) {
             return;
         }
         match = MatchEngine.startNextContract(match);
@@ -490,19 +553,21 @@ public final class GameRoom {
         }
     }
 
-    private boolean allHumansVoted() {
+    /** Tous les sièges humains ont-ils déposé un vote dans le tableau fourni ? */
+    private boolean allHumansVoted(Boolean[] ballots) {
         for (int seat = 0; seat < playerCount; seat++) {
-            if (!isBot[seat] && votes[seat] == null) {
+            if (!isBot[seat] && ballots[seat] == null) {
                 return false;
             }
         }
         return true;
     }
 
-    private int stopVoteCount() {
+    /** Nombre de "oui" (true) déposés par des humains dans le tableau fourni. */
+    private int yesVotes(Boolean[] ballots) {
         int yes = 0;
         for (int seat = 0; seat < playerCount; seat++) {
-            if (!isBot[seat] && Boolean.TRUE.equals(votes[seat])) {
+            if (!isBot[seat] && Boolean.TRUE.equals(ballots[seat])) {
                 yes++;
             }
         }
@@ -515,13 +580,79 @@ public final class GameRoom {
             voteTimeout.cancel(false);
             voteTimeout = null;
         }
-        if (stopVotePasses(stopVoteCount(), humanSeatCount())) {
+        if (stopVotePasses(yesVotes(votes), humanSeatCount())) {
             stopped = true;
             broadcast();
         } else {
             broadcast();
             resume();
         }
+    }
+
+    private boolean pauseEligible() {
+        return pauseAllowed(
+                stopped,
+                voteOpen,
+                pauseVoteOpen,
+                paused,
+                match != null && !MatchEngine.isComplete(match),
+                match != null && match.round() == null,
+                humanSeatCount());
+    }
+
+    private void openPauseVote(int starter) {
+        pauseVoteOpen = true;
+        pauseVotes = new Boolean[playerCount];
+        broadcastChat(starter, names[starter] + " demande une pause d'une minute (votez)");
+        broadcast();
+        pauseVoteTimeout = scheduler.schedule(this::onPauseVoteTimeout, PAUSE_VOTE_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+    }
+
+    private synchronized void onPauseVoteTimeout() {
+        if (pauseVoteOpen) {
+            resolvePauseVote();
+        }
+    }
+
+    private void resolvePauseVote() {
+        pauseVoteOpen = false;
+        if (pauseVoteTimeout != null) {
+            pauseVoteTimeout.cancel(false);
+            pauseVoteTimeout = null;
+        }
+        if (stopVotePasses(yesVotes(pauseVotes), humanSeatCount())) {
+            paused = true;
+            pauseEndsAtMs = System.currentTimeMillis() + PAUSE_DURATION_MS;
+            broadcast();
+            pauseEnd = scheduler.schedule(this::onPauseTimeout, PAUSE_DURATION_MS, TimeUnit.MILLISECONDS);
+        } else {
+            broadcast();
+            resume();
+        }
+    }
+
+    private synchronized void onPauseTimeout() {
+        endPause();
+    }
+
+    private void endPause() {
+        if (!paused) {
+            return;
+        }
+        paused = false;
+        pauseEndsAtMs = 0;
+        if (pauseEnd != null) {
+            pauseEnd.cancel(false);
+            pauseEnd = null;
+        }
+        broadcast();
+        resume();
+    }
+
+    /** Ligne de chat système : réutilise le canal "chat", attribuée au siège déclencheur. */
+    private void broadcastChat(int seat, String text) {
+        broadcastRaw(Map.of(
+                "type", "chat", "seat", seat, "name", names[seat], "text", text, "ts", System.currentTimeMillis()));
     }
 
     private void scheduleBotsIfNeeded() {
@@ -773,9 +904,24 @@ public final class GameRoom {
             Map<String, Object> vote = new LinkedHashMap<>();
             vote.put("open", true);
             vote.put("humans", humanSeatCount());
-            vote.put("stopVotes", stopVoteCount());
+            vote.put("stopVotes", yesVotes(votes));
             vote.put("youVoted", isBot[seat] ? null : votes[seat]);
             view.put("stopVote", vote);
+        }
+
+        if (pauseVoteOpen) {
+            Map<String, Object> pv = new LinkedHashMap<>();
+            pv.put("open", true);
+            pv.put("humans", humanSeatCount());
+            pv.put("pauseVotes", yesVotes(pauseVotes));
+            pv.put("youVoted", isBot[seat] ? null : pauseVotes[seat]);
+            view.put("pauseVote", pv);
+        }
+        if (paused) {
+            Map<String, Object> p = new LinkedHashMap<>();
+            p.put("active", true);
+            p.put("endsAtMs", pauseEndsAtMs);
+            view.put("paused", p);
         }
 
         RoundState round = match.round();

@@ -149,6 +149,10 @@ public class GameWebSocket {
             case "castStopVote" ->
                 withRoomSeat(
                         session, (room, seat) -> room.castStopVote(seat, Boolean.TRUE.equals(command.get("stop"))));
+            case "castPauseVote" ->
+                withRoomSeat(
+                        session, (room, seat) -> room.castPauseVote(seat, Boolean.TRUE.equals(command.get("pause"))));
+            case "resumeGame" -> withRoomSeat(session, (room, seat) -> room.resumeGame(seat));
             case "chat" -> {
                 ChatSend chat = mapper.convertValue(command, ChatSend.class);
                 withRoomSeat(session, (room, seat) -> room.chat(seat, chat.text()));
