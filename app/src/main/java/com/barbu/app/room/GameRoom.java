@@ -273,7 +273,7 @@ public final class GameRoom {
         if (!paused || seat < 0 || seat >= playerCount || isBot[seat]) {
             return;
         }
-        broadcastChat(seat, names[seat] + " relance la partie");
+        broadcastSystemChat(seat, names[seat] + " relance la partie");
         endPause();
     }
 
@@ -295,7 +295,8 @@ public final class GameRoom {
                 "seat", m.seat(),
                 "name", m.name(),
                 "text", m.text(),
-                "ts", m.ts()));
+                "ts", m.ts(),
+                "system", m.system()));
     }
 
     static boolean stopVotePasses(int stopVotes, int humans) {
@@ -317,6 +318,12 @@ public final class GameRoom {
             boolean betweenRounds,
             int humans) {
         return !stopped && !stopVoteOpen && !pauseVoteOpen && !paused && matchActive && betweenRounds && humans > 0;
+    }
+
+    /** Ligne de chat ELO : {@code "Alice : 1200 → 1215 (+15)"} (signe explicite, +0 pour un nul). */
+    static String eloChatLine(String name, int before, int after, int delta) {
+        String sign = delta >= 0 ? "+" : "";
+        return name + " : " + before + " → " + after + " (" + sign + delta + ")";
     }
 
     /**
@@ -361,7 +368,7 @@ public final class GameRoom {
             trimmed = trimmed.substring(0, MAX_CHAT_LEN);
         }
         String clean = filter.sanitize(trimmed);
-        return Optional.of(new ChatBroadcast(seat, name, clean, now));
+        return Optional.of(new ChatBroadcast(seat, name, clean, now, false));
     }
 
     /**
@@ -374,6 +381,9 @@ public final class GameRoom {
         }
         sessions[seat] = null;
         if (match != null) {
+            if (!isBot[seat]) {
+                broadcastSystemChat(seat, names[seat] + " s'est déconnecté");
+            }
             broadcast();
         }
     }
@@ -395,6 +405,7 @@ public final class GameRoom {
         isBot[seat] = false;
         abandoned[seat] = false;
         strikes[seat] = 0;
+        broadcastSystemChat(seat, names[seat] + " est revenu à la table");
         broadcast();
         return seat;
     }
@@ -603,7 +614,7 @@ public final class GameRoom {
     private void openPauseVote(int starter) {
         pauseVoteOpen = true;
         pauseVotes = new Boolean[playerCount];
-        broadcastChat(starter, names[starter] + " demande une pause d'une minute (votez)");
+        broadcastSystemChat(starter, names[starter] + " demande une pause d'une minute (votez)");
         broadcast();
         pauseVoteTimeout = scheduler.schedule(this::onPauseVoteTimeout, PAUSE_VOTE_TIMEOUT_MS, TimeUnit.MILLISECONDS);
     }
@@ -649,10 +660,21 @@ public final class GameRoom {
         resume();
     }
 
-    /** Ligne de chat système : réutilise le canal "chat", attribuée au siège déclencheur. */
-    private void broadcastChat(int seat, String text) {
+    /** Ligne de chat système (deco/reco/bot/ELO/pause) : attribuée à un siège, rendue à part côté client. */
+    private void broadcastSystemChat(int seat, String text) {
         broadcastRaw(Map.of(
-                "type", "chat", "seat", seat, "name", names[seat], "text", text, "ts", System.currentTimeMillis()));
+                "type",
+                "chat",
+                "seat",
+                seat,
+                "name",
+                names[seat],
+                "text",
+                text,
+                "ts",
+                System.currentTimeMillis(),
+                "system",
+                true));
     }
 
     private void scheduleBotsIfNeeded() {
@@ -712,6 +734,7 @@ public final class GameRoom {
         if (++strikes[seat] >= turnTimeoutStrikes) {
             isBot[seat] = true;
             abandoned[seat] = true;
+            broadcastSystemChat(seat, names[seat] + " laisse sa place à un bot");
         }
         afterAdvance();
     }
@@ -867,6 +890,11 @@ public final class GameRoom {
                     "delta", u.delta()));
         }
         broadcastRaw(Map.of("type", "rankedResult", "entries", entries));
+        for (RatingService.RatingUpdate u : updates) {
+            if (userIds[u.seat()] != null) {
+                broadcastSystemChat(u.seat(), eloChatLine(names[u.seat()], u.before(), u.after(), u.delta()));
+            }
+        }
     }
 
     public synchronized Map<String, Object> viewFor(int seat) {

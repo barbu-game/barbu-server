@@ -10,4 +10,4 @@ import io.micronaut.openapi.annotation.OpenAPIExtraSchema;
  * {@code @barbu-game/barbu-api}. Source unique de vérité du contrat.
  */
 @OpenAPIExtraSchema
-public record ChatBroadcast(int seat, String name, String text, long ts) {}
+public record ChatBroadcast(int seat, String name, String text, long ts, boolean system) {}
