@@ -1,5 +1,8 @@
 package com.barbu.app.protocol;
 
+import com.barbu.app.protocol.GameStateMessage.BoardCell;
+import com.barbu.app.protocol.GameStateMessage.CardView;
+import com.barbu.app.protocol.GameStateMessage.MoveView;
 import com.barbu.engine.card.Card;
 import com.barbu.engine.card.Rank;
 import com.barbu.engine.card.Suit;
@@ -12,27 +15,19 @@ import java.util.Map;
 public final class Codec {
     private Codec() {}
 
-    public static Map<String, Object> cardToMap(Card card) {
-        Map<String, Object> map = new LinkedHashMap<>();
-        map.put("suit", card.suit().name());
-        map.put("rank", card.rank().name());
-        return map;
+    public static CardView cardView(Card card) {
+        return new CardView(card.suit().name(), card.rank().name());
     }
 
     public static Card parseCard(Map<String, Object> map) {
         return new Card(Suit.valueOf((String) map.get("suit")), Rank.valueOf((String) map.get("rank")));
     }
 
-    public static Map<String, Object> moveToMap(Move move) {
-        Map<String, Object> map = new LinkedHashMap<>();
+    public static MoveView moveView(Move move) {
         if (move instanceof Move.PlayCard play) {
-            map.put("kind", "card");
-            map.put("suit", play.card().suit().name());
-            map.put("rank", play.card().rank().name());
-        } else {
-            map.put("kind", "pass");
+            return MoveView.card(play.card().suit().name(), play.card().rank().name());
         }
-        return map;
+        return MoveView.pass();
     }
 
     @SuppressWarnings("unchecked")
@@ -44,15 +39,13 @@ public final class Codec {
         return new Move.PlayCard(parseCard((Map<String, Object>) (Map<?, ?>) map));
     }
 
-    public static Map<String, Object> boardToMap(MontanteBoard board) {
-        Map<String, Object> columns = new LinkedHashMap<>();
+    public static Map<String, BoardCell> boardView(MontanteBoard board) {
+        Map<String, BoardCell> columns = new LinkedHashMap<>();
         for (Suit suit : Suit.values()) {
-            Map<String, Object> col = new LinkedHashMap<>();
             boolean opened = board.isOpened(suit);
-            col.put("opened", opened);
-            col.put("low", opened ? board.low()[suit.ordinal()] : 0);
-            col.put("high", opened ? board.high()[suit.ordinal()] : 0);
-            columns.put(suit.name(), col);
+            int low = opened ? board.low()[suit.ordinal()] : 0;
+            int high = opened ? board.high()[suit.ordinal()] : 0;
+            columns.put(suit.name(), new BoardCell(opened, low, high));
         }
         return columns;
     }

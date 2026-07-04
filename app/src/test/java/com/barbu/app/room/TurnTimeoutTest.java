@@ -4,21 +4,18 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.barbu.app.protocol.GameStateMessage;
+import com.barbu.app.protocol.GameStateMessage.PlayerInfo;
 import com.barbu.engine.variant.Variants;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.util.List;
-import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import org.junit.jupiter.api.Test;
 
 class TurnTimeoutTest {
 
-    @SuppressWarnings("unchecked")
-    private static Map<String, Object> player(GameRoom room, int seat) {
-        List<Map<String, Object>> players =
-                (List<Map<String, Object>>) room.viewFor(0).get("players");
-        return players.get(seat);
+    private static PlayerInfo player(GameRoom room, int seat) {
+        return room.viewFor(0).players().get(seat);
     }
 
     private static GameRoom room(ScheduledExecutorService scheduler, long timeoutMs, int strikes) {
@@ -50,15 +47,13 @@ class TurnTimeoutTest {
             assertTrue(room.start(42L));
 
             room.handleDisconnect(seat);
-            assertFalse((Boolean) player(room, seat).get("bot"), "disconnect alone must not bot the seat");
+            assertFalse(player(room, seat).bot(), "disconnect alone must not bot the seat");
 
             long deadline = System.currentTimeMillis() + 4000;
-            while (!(Boolean) player(room, seat).get("bot") && System.currentTimeMillis() < deadline) {
+            while (!player(room, seat).bot() && System.currentTimeMillis() < deadline) {
                 Thread.sleep(20);
             }
-            assertTrue(
-                    (Boolean) player(room, seat).get("bot"),
-                    "after two consecutive timeouts the seat is handed to a bot");
+            assertTrue(player(room, seat).bot(), "after two consecutive timeouts the seat is handed to a bot");
         } finally {
             scheduler.shutdownNow();
         }
@@ -77,9 +72,9 @@ class TurnTimeoutTest {
             long deadline = System.currentTimeMillis() + 2000;
             Object epoch = null;
             while (epoch == null && System.currentTimeMillis() < deadline) {
-                Map<String, Object> view = room.viewFor(0);
-                if (Integer.valueOf(0).equals(view.get("currentActor"))) {
-                    epoch = view.get("turnDeadlineEpochMs");
+                GameStateMessage view = room.viewFor(0);
+                if (Integer.valueOf(0).equals(view.currentActor())) {
+                    epoch = view.turnDeadlineEpochMs();
                 }
                 if (epoch == null) {
                     Thread.sleep(20);

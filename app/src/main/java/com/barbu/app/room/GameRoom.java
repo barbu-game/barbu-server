@@ -5,6 +5,18 @@ import com.barbu.app.persistence.MatchRecorder;
 import com.barbu.app.protocol.ChatBroadcast;
 import com.barbu.app.protocol.ChatFilter;
 import com.barbu.app.protocol.Codec;
+import com.barbu.app.protocol.GameStateMessage;
+import com.barbu.app.protocol.GameStateMessage.BoardCell;
+import com.barbu.app.protocol.GameStateMessage.CardView;
+import com.barbu.app.protocol.GameStateMessage.LastRound;
+import com.barbu.app.protocol.GameStateMessage.MoveView;
+import com.barbu.app.protocol.GameStateMessage.PauseVoteState;
+import com.barbu.app.protocol.GameStateMessage.PausedState;
+import com.barbu.app.protocol.GameStateMessage.PlayerInfo;
+import com.barbu.app.protocol.GameStateMessage.Standing;
+import com.barbu.app.protocol.GameStateMessage.TrickView;
+import com.barbu.app.protocol.GameStateMessage.VariantInfo;
+import com.barbu.app.protocol.GameStateMessage.VoteState;
 import com.barbu.app.rating.RatingService;
 import com.barbu.bot.BotStrategy;
 import com.barbu.bot.HeuristicBot;
@@ -25,7 +37,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micronaut.websocket.WebSocketSession;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -899,105 +910,130 @@ public final class GameRoom {
         }
     }
 
-    public synchronized Map<String, Object> viewFor(int seat) {
-        Map<String, Object> view = new LinkedHashMap<>();
-        view.put("type", "state");
-        view.put("roomId", id);
-        view.put("playerCount", playerCount);
-        view.put("yourSeat", seat);
-        if (resumeTokens[seat] != null) {
-            view.put("resumeToken", resumeTokens[seat]);
-        }
-        view.put("phase", phase());
-        view.put("players", playersInfo());
+    public synchronized GameStateMessage viewFor(int seat) {
+        String resumeToken = resumeTokens[seat];
+        List<PlayerInfo> players = playersInfo();
+        VariantInfo variantInfo = new VariantInfo(variant.id(), variant.name());
 
-        Map<String, Object> variantInfo = new LinkedHashMap<>();
-        variantInfo.put("id", variant.id());
-        variantInfo.put("name", variant.name());
-        view.put("variant", variantInfo);
+        Integer dealer = null;
+        Integer roundNumber = null;
+        Integer plannedRounds = null;
+        List<Integer> totals = null;
+        List<Standing> standings = null;
+        VoteState stopVote = null;
+        PauseVoteState pauseVote = null;
+        PausedState pausedState = null;
+        Integer currentActor = null;
+        Long turnDeadline = null;
+        String contract = null;
+        List<Integer> handCounts = null;
+        List<CardView> yourHand = null;
+        List<Integer> roundScores = null;
+        List<List<CardView>> captured = null;
+        TrickView trick = null;
+        Map<String, BoardCell> board = null;
+        Boolean resolving = null;
+        String nextContract = null;
+        LastRound lastRound = null;
+        List<MoveView> yourLegalMoves = null;
 
-        if (match == null) {
-            return view;
-        }
+        if (match != null) {
+            dealer = match.dealer();
+            roundNumber = match.roundNumber();
+            plannedRounds = match.plannedRounds();
+            totals = toList(match.totals());
 
-        view.put("dealer", match.dealer());
-        view.put("roundNumber", match.roundNumber());
-        view.put("plannedRounds", match.plannedRounds());
-        view.put("totals", toList(match.totals()));
+            if (stopped || MatchEngine.isComplete(match)) {
+                standings = standings();
+            } else {
+                if (voteOpen) {
+                    stopVote = new VoteState(true, humanSeatCount(), yesVotes(votes), isBot[seat] ? null : votes[seat]);
+                }
+                if (pauseVoteOpen) {
+                    pauseVote = new PauseVoteState(
+                            true, humanSeatCount(), yesVotes(pauseVotes), isBot[seat] ? null : pauseVotes[seat]);
+                }
+                if (paused) {
+                    pausedState = new PausedState(true, pauseEndsAtMs);
+                }
 
-        if (stopped || MatchEngine.isComplete(match)) {
-            view.put("standings", standings());
-            return view;
-        }
+                RoundState round = match.round();
+                if (round == null) {
+                    currentActor = match.dealer();
+                    nextContract = MatchEngine.nextContract(match).name();
+                    if (!match.history().isEmpty()) {
+                        lastRound = lastRoundView();
+                    }
+                } else {
+                    currentActor = round.currentPlayer();
+                    if (turnDeadlineEpochMs > 0 && round.currentPlayer() == turnTimeoutSeat) {
+                        turnDeadline = turnDeadlineEpochMs;
+                    }
+                    contract = round.contract().name();
+                    handCounts = handCounts(round);
+                    yourHand = handViews(handsOf(round).get(seat));
 
-        if (voteOpen) {
-            Map<String, Object> vote = new LinkedHashMap<>();
-            vote.put("open", true);
-            vote.put("humans", humanSeatCount());
-            vote.put("stopVotes", yesVotes(votes));
-            vote.put("youVoted", isBot[seat] ? null : votes[seat]);
-            view.put("stopVote", vote);
-        }
+                    if (round instanceof TrickTakingState t) {
+                        trick = trickView(t.currentTrick());
+                        int[] running = match.variant()
+                                .trickRules()
+                                .get(t.contract())
+                                .runningScore(
+                                        new TrickOutcome(t.captured(), t.trickTakers(), playerCount),
+                                        notYetCaptured(t));
+                        List<Integer> rs = new ArrayList<>();
+                        for (int s = 0; s < playerCount; s++) {
+                            rs.add(running[s]);
+                        }
+                        roundScores = rs;
+                        captured = capturedPerSeat(t);
+                    } else if (round instanceof MontanteState m) {
+                        board = Codec.boardView(m.board());
+                    }
 
-        if (pauseVoteOpen) {
-            Map<String, Object> pv = new LinkedHashMap<>();
-            pv.put("open", true);
-            pv.put("humans", humanSeatCount());
-            pv.put("pauseVotes", yesVotes(pauseVotes));
-            pv.put("youVoted", isBot[seat] ? null : pauseVotes[seat]);
-            view.put("pauseVote", pv);
-        }
-        if (paused) {
-            Map<String, Object> p = new LinkedHashMap<>();
-            p.put("active", true);
-            p.put("endsAtMs", pauseEndsAtMs);
-            view.put("paused", p);
-        }
-
-        RoundState round = match.round();
-        if (round == null) {
-            view.put("currentActor", match.dealer());
-            view.put("nextContract", MatchEngine.nextContract(match).name());
-            if (!match.history().isEmpty()) {
-                view.put("lastRound", lastRoundView());
+                    if (trickResolving) {
+                        resolving = true;
+                    } else if (round.currentPlayer() == seat) {
+                        List<MoveView> moves = new ArrayList<>();
+                        for (Move move : RoundEngine.legalMoves(round, seat)) {
+                            moves.add(Codec.moveView(move));
+                        }
+                        yourLegalMoves = moves;
+                    }
+                }
             }
-            return view;
         }
 
-        view.put("currentActor", round.currentPlayer());
-        if (turnDeadlineEpochMs > 0 && round.currentPlayer() == turnTimeoutSeat) {
-            view.put("turnDeadlineEpochMs", turnDeadlineEpochMs);
-        }
-        view.put("contract", round.contract().name());
-        view.put("handCounts", handCounts(round));
-        view.put("yourHand", handMaps(handsOf(round).get(seat)));
-
-        if (round instanceof TrickTakingState t) {
-            view.put("trick", trickView(t.currentTrick()));
-            int[] running = match.variant()
-                    .trickRules()
-                    .get(t.contract())
-                    .runningScore(new TrickOutcome(t.captured(), t.trickTakers(), playerCount), notYetCaptured(t));
-            List<Integer> roundScores = new ArrayList<>();
-            for (int s = 0; s < playerCount; s++) {
-                roundScores.add(running[s]);
-            }
-            view.put("roundScores", roundScores);
-            view.put("captured", capturedPerSeat(t));
-        } else if (round instanceof MontanteState m) {
-            view.put("board", Codec.boardToMap(m.board()));
-        }
-
-        if (trickResolving) {
-            view.put("resolving", true);
-        } else if (round.currentPlayer() == seat) {
-            List<Map<String, Object>> moves = new ArrayList<>();
-            for (Move move : RoundEngine.legalMoves(round, seat)) {
-                moves.add(Codec.moveToMap(move));
-            }
-            view.put("yourLegalMoves", moves);
-        }
-        return view;
+        return new GameStateMessage(
+                "state",
+                id,
+                playerCount,
+                seat,
+                resumeToken,
+                phase(),
+                players,
+                variantInfo,
+                dealer,
+                roundNumber,
+                plannedRounds,
+                totals,
+                standings,
+                stopVote,
+                pauseVote,
+                pausedState,
+                currentActor,
+                turnDeadline,
+                contract,
+                handCounts,
+                yourHand,
+                roundScores,
+                captured,
+                trick,
+                board,
+                resolving,
+                nextContract,
+                lastRound,
+                yourLegalMoves);
     }
 
     /**
@@ -1029,21 +1065,18 @@ public final class GameRoom {
         return match.round() == null ? "CONTRACT_SELECTION" : "PLAYING";
     }
 
-    private List<Map<String, Object>> playersInfo() {
-        List<Map<String, Object>> players = new ArrayList<>();
+    private List<PlayerInfo> playersInfo() {
+        List<PlayerInfo> players = new ArrayList<>();
         for (int seat = 0; seat < playerCount; seat++) {
-            Map<String, Object> p = new LinkedHashMap<>();
-            p.put("seat", seat);
-            p.put("name", names[seat] == null ? "Empty" : names[seat]);
-            p.put("bot", isBot[seat]);
-            p.put("connected", sessions[seat] != null && sessions[seat].isOpen());
-            players.add(p);
+            String name = names[seat] == null ? "Empty" : names[seat];
+            boolean connected = sessions[seat] != null && sessions[seat].isOpen();
+            players.add(new PlayerInfo(seat, name, isBot[seat], connected));
         }
         return players;
     }
 
     /** Recap of the just-finished round: who scored what, ranked on that round alone. */
-    private Map<String, Object> lastRoundView() {
+    private LastRound lastRoundView() {
         List<RoundResult> history = match.history();
         RoundResult last = history.get(history.size() - 1);
         int[] points = last.points();
@@ -1054,54 +1087,34 @@ public final class GameRoom {
         }
         order.sort(Comparator.comparingInt((Integer s) -> points[s]).reversed());
 
-        List<Map<String, Object>> ranking = new ArrayList<>();
+        List<LastRound.RankRow> ranking = new ArrayList<>();
         for (int rank = 0; rank < order.size(); rank++) {
             int s = order.get(rank);
-            Map<String, Object> row = new LinkedHashMap<>();
-            row.put("rank", rank + 1);
-            row.put("seat", s);
-            row.put("name", names[s]);
-            row.put("points", points[s]);
-            ranking.add(row);
+            ranking.add(new LastRound.RankRow(rank + 1, s, names[s], points[s]));
         }
-
-        Map<String, Object> recap = new LinkedHashMap<>();
-        recap.put("contract", last.contract().name());
-        recap.put("ranking", ranking);
-        return recap;
+        return new LastRound(last.contract().name(), ranking);
     }
 
-    private List<Map<String, Object>> standings() {
-        List<Map<String, Object>> standings = new ArrayList<>();
+    private List<Standing> standings() {
+        List<Standing> standings = new ArrayList<>();
         List<Integer> order = MatchEngine.standings(match);
         for (int rank = 0; rank < order.size(); rank++) {
             int seat = order.get(rank);
-            Map<String, Object> row = new LinkedHashMap<>();
-            row.put("rank", rank + 1);
-            row.put("seat", seat);
-            row.put("name", names[seat]);
-            row.put("total", match.totals()[seat]);
-            standings.add(row);
+            standings.add(new Standing(rank + 1, seat, names[seat], match.totals()[seat]));
         }
         return standings;
     }
 
-    private Map<String, Object> trickView(Trick trick) {
-        List<Map<String, Object>> plays = new ArrayList<>();
+    private TrickView trickView(Trick trick) {
+        List<TrickView.TrickPlay> plays = new ArrayList<>();
         for (int i = 0; i < trick.cards().size(); i++) {
-            Map<String, Object> play = new LinkedHashMap<>();
-            play.put("seat", trick.playerAt(i));
-            play.put("card", Codec.cardToMap(trick.cards().get(i)));
-            plays.add(play);
+            plays.add(new TrickView.TrickPlay(
+                    trick.playerAt(i), Codec.cardView(trick.cards().get(i))));
         }
-        Map<String, Object> view = new LinkedHashMap<>();
-        view.put("leader", trick.leader());
-        view.put("plays", plays);
         if (trick.isComplete()) {
-            view.put("complete", true);
-            view.put("taker", trick.taker());
+            return new TrickView(trick.leader(), plays, true, trick.taker());
         }
-        return view;
+        return new TrickView(trick.leader(), plays, null, null);
     }
 
     private static List<List<Card>> handsOf(RoundState round) {
@@ -1119,18 +1132,18 @@ public final class GameRoom {
         return counts;
     }
 
-    private static List<Map<String, Object>> handMaps(List<Card> hand) {
-        List<Map<String, Object>> cards = new ArrayList<>();
+    private static List<CardView> handViews(List<Card> hand) {
+        List<CardView> cards = new ArrayList<>();
         for (Card card : hand) {
-            cards.add(Codec.cardToMap(card));
+            cards.add(Codec.cardView(card));
         }
         return cards;
     }
 
-    private static List<List<Map<String, Object>>> capturedPerSeat(TrickTakingState t) {
-        List<List<Map<String, Object>>> out = new ArrayList<>();
+    private static List<List<CardView>> capturedPerSeat(TrickTakingState t) {
+        List<List<CardView>> out = new ArrayList<>();
         for (List<Card> seatCards : t.captured()) {
-            out.add(handMaps(seatCards));
+            out.add(handViews(seatCards));
         }
         return out;
     }
