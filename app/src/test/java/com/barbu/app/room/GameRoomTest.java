@@ -34,6 +34,21 @@ class GameRoomTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
+    void guest_name_is_trimmed_and_clamped_to_the_limit() {
+        ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+        try {
+            GameRoom room = new GameRoom("TESTN", 3, Variants.DEVELOPER, new ObjectMapper(), scheduler, 0, null, null);
+            int seat = room.addHuman(new FakeSession(), "  " + "z".repeat(60) + "  ", null);
+            List<Map<String, Object>> players =
+                    (List<Map<String, Object>>) room.viewFor(seat).get("players");
+            assertEquals("z".repeat(40), players.get(seat).get("name"));
+        } finally {
+            scheduler.shutdownNow();
+        }
+    }
+
+    @Test
     void start_is_refused_until_all_seats_are_filled() {
         ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
         try {

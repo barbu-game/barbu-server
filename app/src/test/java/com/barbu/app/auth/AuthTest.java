@@ -48,6 +48,16 @@ class AuthTest {
     }
 
     @Test
+    void register_rejects_an_overlong_username() {
+        HttpClientResponseException ex = assertThrows(
+                HttpClientResponseException.class,
+                () -> client.toBlocking()
+                        .exchange(HttpRequest.POST(
+                                "/auth/register", Map.of("username", "x".repeat(41), "password", "pw123456"))));
+        assertEquals(400, ex.getStatus().getCode());
+    }
+
+    @Test
     void me_requires_authentication() {
         HttpClientResponseException ex = assertThrows(
                 HttpClientResponseException.class, () -> client.toBlocking().exchange(HttpRequest.GET("/me")));

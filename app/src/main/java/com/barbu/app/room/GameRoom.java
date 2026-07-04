@@ -1,5 +1,6 @@
 package com.barbu.app.room;
 
+import com.barbu.app.PlayerNames;
 import com.barbu.app.persistence.MatchRecorder;
 import com.barbu.app.protocol.ChatBroadcast;
 import com.barbu.app.protocol.ChatFilter;
@@ -182,7 +183,8 @@ public final class GameRoom {
             return -1;
         }
         sessions[seat] = session;
-        names[seat] = name == null || name.isBlank() ? "Player " + seat : name;
+        String normalized = PlayerNames.normalizeGuest(name);
+        names[seat] = normalized == null ? "Player " + seat : normalized;
         userIds[seat] = userId;
         isBot[seat] = false;
         resumeTokens[seat] = UUID.randomUUID().toString();
