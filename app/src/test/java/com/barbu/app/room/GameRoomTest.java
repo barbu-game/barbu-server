@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import com.barbu.engine.variant.Variants;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -60,6 +61,34 @@ class GameRoomTest {
             }
             assertEquals("GAME_OVER", room.viewFor(0).get("phase"));
             assertEquals("classic", ((Map<?, ?>) room.viewFor(0).get("variant")).get("id"));
+        } finally {
+            scheduler.shutdownNow();
+        }
+    }
+
+    @Test
+    void captured_is_exposed_per_seat_during_trick_taking() throws InterruptedException {
+        ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+        try {
+            GameRoom room = new GameRoom("CAPTR", 3, Variants.DEVELOPER, new ObjectMapper(), scheduler, 0, null, null);
+            assertTrue(room.addBot());
+            assertTrue(room.addBot());
+            assertTrue(room.addBot());
+            assertTrue(room.start(42L));
+
+            // Take a single consistent snapshot once a trick-taking round is in progress.
+            Map<String, Object> view = null;
+            long deadline = System.currentTimeMillis() + 5000;
+            while (System.currentTimeMillis() < deadline) {
+                view = room.viewFor(0);
+                if (view.get("trick") != null) {
+                    break;
+                }
+                Thread.sleep(10);
+            }
+            assertNotNull(view.get("trick"), "expected a trick-taking round in progress");
+            assertNotNull(view.get("captured"), "captured must be exposed during trick-taking");
+            assertEquals(3, ((List<?>) view.get("captured")).size(), "captured is indexed by seat");
         } finally {
             scheduler.shutdownNow();
         }

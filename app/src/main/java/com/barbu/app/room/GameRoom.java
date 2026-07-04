@@ -981,6 +981,7 @@ public final class GameRoom {
                 roundScores.add(running[s]);
             }
             view.put("roundScores", roundScores);
+            view.put("captured", capturedPerSeat(t));
         } else if (round instanceof MontanteState m) {
             view.put("board", Codec.boardToMap(m.board()));
         }
@@ -1122,6 +1123,14 @@ public final class GameRoom {
             cards.add(Codec.cardToMap(card));
         }
         return cards;
+    }
+
+    private static List<List<Map<String, Object>>> capturedPerSeat(TrickTakingState t) {
+        List<List<Map<String, Object>>> out = new ArrayList<>();
+        for (List<Card> seatCards : t.captured()) {
+            out.add(handMaps(seatCards));
+        }
+        return out;
     }
 
     private static List<Integer> toList(int[] values) {
