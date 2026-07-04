@@ -87,7 +87,7 @@ class RoundInvariantsTest {
     void montante_always_terminates_and_is_zero_sum(
             @ForAll @IntRange(min = 2, max = 10) int n, @ForAll @LongRange(min = 0, max = 400) long seed) {
         List<List<Card>> hands = deal(n, seed);
-        RoundState s = RoundEngine.startMontante(hands, RoundEngine.eightOfDiamondsHolder(hands));
+        RoundState s = RoundEngine.startMontante(hands, 0);
         int guard = 0;
         while (!s.isComplete()) {
             s = RoundEngine.applyMove(

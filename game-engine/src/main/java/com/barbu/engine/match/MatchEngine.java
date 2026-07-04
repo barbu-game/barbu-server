@@ -88,9 +88,10 @@ public final class MatchEngine {
         long roundSeed = m.seed() * 31 + m.roundNumber();
         List<List<Card>> hands = deal(m.playerCount(), roundSeed);
 
+        int opener = Seats.next(m.dealer(), m.playerCount());
         RoundState round = contract.type() == ContractType.MONTANTE
-                ? RoundEngine.startMontante(hands, RoundEngine.eightOfDiamondsHolder(hands))
-                : RoundEngine.startTrickTaking(contract, hands, Seats.next(m.dealer(), m.playerCount()));
+                ? RoundEngine.startMontante(hands, opener)
+                : RoundEngine.startTrickTaking(contract, hands, opener);
 
         return new MatchState(
                 m.playerCount(),

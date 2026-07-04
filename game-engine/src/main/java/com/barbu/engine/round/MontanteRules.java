@@ -2,7 +2,6 @@ package com.barbu.engine.round;
 
 import com.barbu.engine.card.Card;
 import com.barbu.engine.card.Rank;
-import com.barbu.engine.card.Suit;
 import com.barbu.engine.model.Move;
 import com.barbu.engine.model.ScoringConfig;
 import com.barbu.engine.model.Seats;
@@ -14,14 +13,9 @@ import java.util.Map;
 public final class MontanteRules {
     private MontanteRules() {}
 
-    private static final Card EIGHT_OF_DIAMONDS = new Card(Suit.DIAMONDS, Rank.EIGHT);
-
     public static List<Move> legalMoves(MontanteState state, int seat) {
         if (seat != state.currentPlayer() || state.hasFinished(seat)) {
             return List.of();
-        }
-        if (isBoardEmpty(state.board())) {
-            return List.of(new Move.PlayCard(EIGHT_OF_DIAMONDS));
         }
         List<Move> playable = new ArrayList<>();
         for (Card c : state.hands().get(seat)) {
@@ -95,15 +89,6 @@ public final class MontanteRules {
             }
         }
         return false;
-    }
-
-    private static boolean isBoardEmpty(MontanteBoard board) {
-        for (Suit suit : Suit.values()) {
-            if (board.isOpened(suit)) {
-                return false;
-            }
-        }
-        return true;
     }
 
     private static int nextActive(int seat, List<List<Card>> hands) {

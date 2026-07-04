@@ -51,6 +51,16 @@ class MatchEngineTest {
     }
 
     @Test
+    void montante_opens_left_of_dealer_regardless_of_eight_holder() {
+        // Donneur = 0 (newMatch), donc l'ouvreur doit toujours être le siège 1,
+        // quel que soit le détenteur du 8 de carreau sur chaque graine.
+        for (long seed = 0; seed < 10; seed++) {
+            MatchState m = MatchEngine.chooseContract(MatchEngine.newMatch(5, seed), Contract.MONTANTE);
+            assertEquals(1, m.round().currentPlayer(), "seed=" + seed);
+        }
+    }
+
+    @Test
     void dealer_cannot_replay_a_contract_in_their_turn() {
         MatchState m = MatchEngine.playOut(MatchEngine.chooseContract(MatchEngine.newMatch(3, 1L), Contract.NO_TRICKS));
         assertThrows(IllegalArgumentException.class, () -> MatchEngine.chooseContract(m, Contract.NO_TRICKS));

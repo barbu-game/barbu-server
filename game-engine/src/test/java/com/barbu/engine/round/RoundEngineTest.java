@@ -28,14 +28,13 @@ class RoundEngineTest {
     }
 
     @Test
-    void starts_montante_with_the_eight_of_diamonds_holder() {
+    void starts_montante_at_the_given_opener_seat() {
         List<List<Card>> hands = List.of(
                 List.of(c(Suit.CLUBS, Rank.TWO)),
                 List.of(c(Suit.DIAMONDS, Rank.EIGHT)),
                 List.of(c(Suit.CLUBS, Rank.THREE)));
-        int holder = RoundEngine.eightOfDiamondsHolder(hands);
-        RoundState s = RoundEngine.startMontante(hands, holder);
-        assertEquals(1, s.currentPlayer());
+        RoundState s = RoundEngine.startMontante(hands, 2);
+        assertEquals(2, s.currentPlayer());
         assertEquals(Contract.MONTANTE, s.contract());
     }
 

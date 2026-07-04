@@ -197,7 +197,7 @@ class MontanteRulesTest {
     }
 
     @Test
-    void opening_move_must_be_eight_of_diamonds() {
+    void opening_move_is_any_eight_held() {
         MontanteState s = new MontanteState(
                 List.of(
                         List.of(c(Suit.DIAMONDS, Rank.EIGHT), c(Suit.SPADES, Rank.EIGHT)),
@@ -208,7 +208,20 @@ class MontanteRulesTest {
                 List.of(),
                 0,
                 0);
-        assertEquals(List.of(new Move.PlayCard(c(Suit.DIAMONDS, Rank.EIGHT))), MontanteRules.legalMoves(s, 0));
+        assertEquals(
+                List.of(new Move.PlayCard(c(Suit.DIAMONDS, Rank.EIGHT)), new Move.PlayCard(c(Suit.SPADES, Rank.EIGHT))),
+                MontanteRules.legalMoves(s, 0));
+    }
+
+    @Test
+    void opener_without_any_eight_must_pass() {
+        MontanteState s = new MontanteState(
+                List.of(List.of(c(Suit.CLUBS, Rank.TWO), c(Suit.HEARTS, Rank.SEVEN)), List.of(), List.of(), List.of()),
+                MontanteBoard.empty(),
+                List.of(),
+                0,
+                0);
+        assertEquals(List.of(new Move.Pass()), MontanteRules.legalMoves(s, 0));
     }
 
     @Test

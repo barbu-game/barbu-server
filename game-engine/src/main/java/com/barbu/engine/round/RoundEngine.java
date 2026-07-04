@@ -1,8 +1,6 @@
 package com.barbu.engine.round;
 
 import com.barbu.engine.card.Card;
-import com.barbu.engine.card.Rank;
-import com.barbu.engine.card.Suit;
 import com.barbu.engine.model.Contract;
 import com.barbu.engine.model.Move;
 import java.util.ArrayList;
@@ -19,8 +17,8 @@ public final class RoundEngine {
         return new TrickTakingState(contract, hands, Trick.startedBy(leader, hands.size()), empty, List.of(), leader);
     }
 
-    public static RoundState startMontante(List<List<Card>> hands, int eightOfDiamondsHolder) {
-        return new MontanteState(hands, MontanteBoard.empty(), List.of(), 0, eightOfDiamondsHolder);
+    public static RoundState startMontante(List<List<Card>> hands, int opener) {
+        return new MontanteState(hands, MontanteBoard.empty(), List.of(), 0, opener);
     }
 
     public static List<Move> legalMoves(RoundState state, int seat) {
@@ -40,15 +38,5 @@ public final class RoundEngine {
     /** Clear a displayed, finished trick so its taker can lead the next one (trick-taking only). */
     public static RoundState collectTrick(RoundState state) {
         return state instanceof TrickTakingState t ? TrickTakingRules.collectTrick(t) : state;
-    }
-
-    public static int eightOfDiamondsHolder(List<List<Card>> hands) {
-        Card target = new Card(Suit.DIAMONDS, Rank.EIGHT);
-        for (int seat = 0; seat < hands.size(); seat++) {
-            if (hands.get(seat).contains(target)) {
-                return seat;
-            }
-        }
-        throw new IllegalArgumentException("8 of diamonds not dealt");
     }
 }
