@@ -27,7 +27,6 @@ public record CardPenalty(Predicate<Card> match, int pointsPerCard, String label
         return pointsPerCard + " per " + label;
     }
 
-    /** All scoring cards are already captured once none remain in any hand. */
     @Override
     public boolean exhausted(List<List<Card>> remainingHands) {
         return remainingHands.stream().flatMap(List::stream).noneMatch(match);

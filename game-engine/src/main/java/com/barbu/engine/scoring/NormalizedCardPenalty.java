@@ -78,7 +78,6 @@ public record NormalizedCardPenalty(Predicate<Card> match, String label) impleme
         return ScoringConfig.POINTS_PER_ROUND + " spread over the " + label + "s";
     }
 
-    /** All scoring cards are already captured once none remain in any hand. */
     @Override
     public boolean exhausted(List<List<Card>> remainingHands) {
         return remainingHands.stream().flatMap(List::stream).noneMatch(match);

@@ -97,9 +97,7 @@ public class CasualMatchmaker implements Matchmaker {
             w.session().put("roomId", room.id());
             w.session().put("seat", seat);
         }
-        while (room.addBot()) {
-            // fill the remaining seats with bots
-        }
+        while (room.addBot()) {}
         room.start(rooms.newSeed());
     }
 
