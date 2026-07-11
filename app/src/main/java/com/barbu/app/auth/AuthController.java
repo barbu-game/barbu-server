@@ -7,11 +7,11 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Post;
+import io.micronaut.openapi.annotation.OpenAPIExtraSchema;
 import io.micronaut.security.annotation.Secured;
 import io.micronaut.security.rules.SecurityRule;
 import jakarta.validation.constraints.NotBlank;
 import java.time.Instant;
-import java.util.Map;
 
 @Controller("/auth")
 @Secured(SecurityRule.IS_ANONYMOUS)
@@ -30,19 +30,25 @@ public class AuthController {
     public record Credentials(
             @NotBlank String username, @NotBlank String password) {}
 
+    @OpenAPIExtraSchema
+    public record AuthToken(String token, String username) {}
+
+    @OpenAPIExtraSchema
+    public record ApiError(String error) {}
+
     @Post("/register")
     public HttpResponse<?> register(@Body Credentials creds) {
         String username = creds.username() == null ? "" : creds.username().trim();
         if (!PlayerNames.isValidAccountName(username)) {
             return HttpResponse.badRequest(
-                    Map.of("error", "username must be 1 to " + PlayerNames.MAX_LEN + " characters"));
+                    new ApiError("username must be 1 to " + PlayerNames.MAX_LEN + " characters"));
         }
         if (users.existsByUsername(username)) {
             return HttpResponse.status(io.micronaut.http.HttpStatus.CONFLICT)
-                    .body(Map.of("error", "username already taken"));
+                    .body(new ApiError("username already taken"));
         }
         users.save(new UserEntity(null, username, hasher.hash(creds.password()), Instant.now()));
-        return HttpResponse.ok(Map.of("token", jwt.issue(username), "username", username));
+        return HttpResponse.ok(new AuthToken(jwt.issue(username), username));
     }
 
     @Post("/login")
@@ -50,7 +56,7 @@ public class AuthController {
         String username = creds.username() == null ? "" : creds.username().trim();
         return users.findByUsername(username)
                 .filter(u -> hasher.matches(creds.password(), u.passwordHash()))
-                .map(u -> HttpResponse.ok((Object) Map.of("token", jwt.issue(u.username()), "username", u.username())))
-                .orElseGet(() -> HttpResponse.unauthorized().body(Map.of("error", "invalid credentials")));
+                .<HttpResponse<?>>map(u -> HttpResponse.ok(new AuthToken(jwt.issue(u.username()), u.username())))
+                .orElseGet(() -> HttpResponse.unauthorized().body(new ApiError("invalid credentials")));
     }
 }
