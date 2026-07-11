@@ -44,6 +44,8 @@ import java.util.UUID;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * One game table held in a single pod's memory. All mutations are serialized on the
@@ -62,6 +64,8 @@ public final class GameRoom {
     private final String mode;
     private final RatingService ratingService;
     private final BotStrategy bot = new HeuristicBot();
+
+    private static final Logger LOG = LoggerFactory.getLogger(GameRoom.class);
 
     private static final long VOTE_TIMEOUT_MS = 15000;
 
@@ -690,12 +694,6 @@ public final class GameRoom {
                 true));
     }
 
-    private void scheduleBotsIfNeeded() {
-        if (currentActorIsBot()) {
-            scheduler.schedule(this::botStep, botDelayMs, TimeUnit.MILLISECONDS);
-        }
-    }
-
     /** Hand control to whoever must act next: a bot move, or a human turn under timeout. */
     private void scheduleActor() {
         cancelTurnTimer();
@@ -823,15 +821,17 @@ public final class GameRoom {
         }
         try {
             recorder.record(mode, match, players);
-        } catch (Exception ignored) {
+        } catch (Exception e) {
             // persistence is best-effort; a failure must not interrupt play
+            LOG.warn("match recording failed for room {} (best-effort, game unaffected)", id, e);
         }
 
         if (ratingService != null && "ranked".equals(mode) && MatchEngine.isComplete(match)) {
             try {
                 broadcastRankedResult(ratingService.applyRankedResult(eloSeats()));
-            } catch (Exception ignored) {
+            } catch (Exception e) {
                 // l'ELO est best-effort : un échec ne doit pas interrompre la fin de partie
+                LOG.warn("ranked ELO update failed for room {} (best-effort, game unaffected)", id, e);
             }
         }
     }
@@ -888,8 +888,9 @@ public final class GameRoom {
         recorded = true;
         try {
             broadcastRankedResult(ratingService.applyRankedResult(eloSeats()));
-        } catch (Exception ignored) {
+        } catch (Exception e) {
             // best-effort : l'échec d'enregistrement ne doit pas bloquer la fermeture de la room
+            LOG.warn("forfeit ELO update failed for room {} (best-effort, room still closes)", id, e);
         }
     }
 

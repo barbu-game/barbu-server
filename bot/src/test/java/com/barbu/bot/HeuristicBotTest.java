@@ -13,9 +13,14 @@ import com.barbu.engine.round.RoundEngine;
 import com.barbu.engine.round.RoundState;
 import com.barbu.engine.round.Trick;
 import com.barbu.engine.round.TrickTakingState;
+import com.barbu.engine.variant.Variant;
+import com.barbu.engine.variant.Variants;
 import java.util.List;
+import net.jqwik.api.Arbitraries;
+import net.jqwik.api.Arbitrary;
 import net.jqwik.api.ForAll;
 import net.jqwik.api.Property;
+import net.jqwik.api.Provide;
 import net.jqwik.api.constraints.IntRange;
 import net.jqwik.api.constraints.LongRange;
 import org.junit.jupiter.api.Test;
@@ -29,8 +34,10 @@ class HeuristicBotTest {
 
     @Property
     void every_chosen_move_is_legal_through_a_full_match(
-            @ForAll @IntRange(min = 2, max = 10) int n, @ForAll @LongRange(min = 0, max = 150) long seed) {
-        MatchState m = MatchEngine.newMatch(n, seed);
+            @ForAll @IntRange(min = 2, max = 10) int n,
+            @ForAll @LongRange(min = 0, max = 150) long seed,
+            @ForAll("variants") Variant variant) {
+        MatchState m = MatchEngine.newMatch(n, seed, variant);
         while (!MatchEngine.isComplete(m)) {
             m = MatchEngine.startNextContract(m);
             while (m.round() != null) {
@@ -39,11 +46,16 @@ class HeuristicBotTest {
                 Move move = bot.chooseMove(round, seat);
                 assertTrue(
                         RoundEngine.legalMoves(round, seat).contains(move),
-                        "illegal bot move n=" + n + " seed=" + seed);
+                        "illegal bot move n=" + n + " seed=" + seed + " variant=" + variant.id());
                 m = MatchEngine.applyMove(m, seat, move);
             }
         }
-        assertEquals(5 * n, m.roundNumber());
+        assertEquals(m.plannedRounds(), m.roundNumber());
+    }
+
+    @Provide
+    Arbitrary<Variant> variants() {
+        return Arbitraries.of(Variants.all());
     }
 
     @Test

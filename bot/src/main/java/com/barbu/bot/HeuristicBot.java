@@ -20,6 +20,9 @@ import java.util.List;
  */
 public final class HeuristicBot implements BotStrategy {
 
+    /** Montante opening rank: cards are unloaded by distance from it (the extremes go first). */
+    private static final int MONTANTE_PIVOT = 8;
+
     @Override
     public Move chooseMove(RoundState state, int seat) {
         List<Move> legal = RoundEngine.legalMoves(state, seat);
@@ -103,7 +106,7 @@ public final class HeuristicBot implements BotStrategy {
             return legal.getFirst();
         }
         Card extreme = cards.stream()
-                .max(Comparator.comparingInt(c -> Math.abs(c.rank().montanteValue() - 8)))
+                .max(Comparator.comparingInt(c -> Math.abs(c.rank().montanteValue() - MONTANTE_PIVOT)))
                 .orElseThrow();
         return new Move.PlayCard(extreme);
     }
@@ -118,6 +121,12 @@ public final class HeuristicBot implements BotStrategy {
         return best;
     }
 
+    /**
+     * Per-card liability for the penalty contracts the bot models. SALADE and NO_LAST_TWO_TRICKS
+     * carry no per-card signal here (default 0): the bot leans on its generic trick-ducking, which
+     * is sound enough for seat-filling on the legacy variants that use them — the product variant
+     * (DEVELOPER) only ever runs the contracts enumerated below.
+     */
     private static int danger(Contract contract, Card card) {
         return switch (contract) {
             case NO_HEARTS -> card.isHeart() ? 1 : 0;
