@@ -784,7 +784,9 @@ public final class GameRoom {
                 continue;
             }
             try {
-                session.sendSync(mapper.writeValueAsString(viewFor(seat)));
+                // sendAsync, never sendSync: a back-pressured client must not block this thread (the
+                // event loop or the shared scheduler) or it starves /health and the pod gets restarted.
+                session.sendAsync(mapper.writeValueAsString(viewFor(seat)));
             } catch (Exception ignored) {
                 // a dropped client is reconciled on its next connect via a fresh snapshot
             }
@@ -800,7 +802,7 @@ public final class GameRoom {
                 continue;
             }
             try {
-                session.sendSync(mapper.writeValueAsString(payload));
+                session.sendAsync(mapper.writeValueAsString(payload));
             } catch (Exception ignored) {
                 // a dropped client is reconciled on its next snapshot; chat is best-effort
             }

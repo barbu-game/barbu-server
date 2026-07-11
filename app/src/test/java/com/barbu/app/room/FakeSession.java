@@ -14,7 +14,7 @@ import java.util.concurrent.CompletableFuture;
 import org.reactivestreams.Publisher;
 
 /** Session WebSocket minimale pour les tests : ne porte que ses attributs, le transport est inerte. */
-final class FakeSession implements WebSocketSession {
+class FakeSession implements WebSocketSession {
     private final MutableConvertibleValues<Object> attrs = MutableConvertibleValues.of(new HashMap<>());
 
     @Override
