@@ -27,6 +27,7 @@ public class RoomManager {
     private final long botDelayMs;
     private final long turnTimeoutMs;
     private final int turnTimeoutStrikes;
+    private final long roomGraceMs;
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
     private final Random random = new Random();
 
@@ -38,7 +39,8 @@ public class RoomManager {
             ReconnectIndex reconnectIndex,
             @Value("${barbu.bot-delay-ms:650}") long botDelayMs,
             @Value("${barbu.turn-timeout-ms:60000}") long turnTimeoutMs,
-            @Value("${barbu.turn-timeout-strikes:2}") int turnTimeoutStrikes) {
+            @Value("${barbu.turn-timeout-strikes:2}") int turnTimeoutStrikes,
+            @Value("${barbu.room-grace-ms:90000}") long roomGraceMs) {
         this.mapper = mapper;
         this.recorder = recorder;
         this.metrics = metrics;
@@ -47,6 +49,7 @@ public class RoomManager {
         this.botDelayMs = botDelayMs;
         this.turnTimeoutMs = turnTimeoutMs;
         this.turnTimeoutStrikes = turnTimeoutStrikes;
+        this.roomGraceMs = roomGraceMs;
     }
 
     public GameRoom create(int requestedPlayerCount, Variant variant) {
@@ -89,8 +92,25 @@ public class RoomManager {
     public void remove(String id) {
         GameRoom room = rooms.remove(id);
         if (room != null) {
+            room.cancelPendingTeardown();
             room.clearReconnectEntries(reconnectIndex);
         }
+    }
+
+    /**
+     * The last human just dropped from this room: defer teardown by the grace window so a backgrounded
+     * host or an invited joiner can return to the same code. Teardown only fires if the room is still
+     * empty of humans when the window closes; any reconnect/join cancels it.
+     */
+    public void scheduleTeardown(String id) {
+        GameRoom room = get(id);
+        if (room == null) {
+            return;
+        }
+        room.scheduleTeardown(roomGraceMs, () -> {
+            room.recordAbandonmentForfeit();
+            remove(id);
+        });
     }
 
     public int activeRoomCount() {

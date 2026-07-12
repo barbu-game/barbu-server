@@ -132,12 +132,49 @@ public class GameWebSocket {
                 rankedMatchmaker.cancel(session);
             }
             case "addBot" ->
-                withRoom(session, room -> {
+                withRoomSeat(session, (room, seat) -> {
+                    if (!room.isHost(seat)) {
+                        sendError(session, "only the host can add a bot");
+                        return;
+                    }
                     room.addBot();
                     room.broadcast();
                 });
+            case "renameBot" ->
+                withRoomSeat(session, (room, seat) -> {
+                    if (!room.isHost(seat)) {
+                        sendError(session, "only the host can rename a bot");
+                        return;
+                    }
+                    if (room.renameBot(asInt(command.get("seat"), -1), asString(command.get("name")))) {
+                        room.broadcast();
+                    }
+                });
+            case "leave" -> {
+                String roomId = session.get("roomId", String.class).orElse(null);
+                Integer seat = session.get("seat", Integer.class).orElse(null);
+                GameRoom room = roomId == null ? null : rooms.get(roomId);
+                if (room == null || seat == null) {
+                    sendError(session, "not in a room");
+                    return;
+                }
+                if (room.leave(seat)) {
+                    session.remove("roomId");
+                    session.remove("seat");
+                    if (room.isEmptyOfHumans()) {
+                        room.recordAbandonmentForfeit();
+                        rooms.remove(roomId);
+                    } else {
+                        room.broadcast();
+                    }
+                }
+            }
             case "start" ->
-                withRoom(session, room -> {
+                withRoomSeat(session, (room, seat) -> {
+                    if (!room.isHost(seat)) {
+                        sendError(session, "only the host can start");
+                        return;
+                    }
                     if (!room.start(rooms.newSeed())) {
                         sendError(session, "cannot start (seats must all be filled)");
                     }
@@ -190,8 +227,9 @@ public class GameWebSocket {
         if (room != null) {
             room.handleDisconnect(seat);
             if (room.isEmptyOfHumans()) {
-                room.recordAbandonmentForfeit();
-                rooms.remove(roomId);
+                // Keep the seat reserved and the room alive for a grace window so a backgrounded host
+                // (or an invited joiner) can return to the same code; teardown is deferred, not immediate.
+                rooms.scheduleTeardown(roomId);
             }
         }
     }

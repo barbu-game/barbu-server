@@ -98,6 +98,8 @@ public final class GameRoom {
     private long pauseEndsAtMs;
     private ScheduledFuture<?> pauseEnd;
 
+    private ScheduledFuture<?> pendingTeardown;
+
     private ScheduledFuture<?> turnTimeout;
     private int turnTimeoutSeat = -1;
     private long turnDeadlineEpochMs;
@@ -193,6 +195,7 @@ public final class GameRoom {
     }
 
     public synchronized int addHuman(WebSocketSession session, String name, Long userId) {
+        cancelPendingTeardown();
         int seat = firstFreeSeat();
         if (seat < 0) {
             return -1;
@@ -217,8 +220,21 @@ public final class GameRoom {
         if (seat < 0) {
             return false;
         }
+        names[seat] = "Bot " + (botCount() + 1);
         isBot[seat] = true;
-        names[seat] = "Bot " + seat;
+        return true;
+    }
+
+    /** Host action (gating done in the WS handler): rename a lobby bot. Blank name → no change. */
+    public synchronized boolean renameBot(int seat, String name) {
+        if (match != null || seat < 0 || seat >= playerCount || !isBot[seat]) {
+            return false;
+        }
+        String normalized = PlayerNames.normalizeGuest(name);
+        if (normalized == null) {
+            return false;
+        }
+        names[seat] = normalized;
         return true;
     }
 
@@ -397,12 +413,11 @@ public final class GameRoom {
             return;
         }
         sessions[seat] = null;
-        if (match != null) {
-            if (!isBot[seat]) {
-                broadcastSystemChat(seat, names[seat] + " s'est déconnecté");
-            }
-            broadcast();
+        if (match != null && !isBot[seat]) {
+            broadcastSystemChat(seat, names[seat] + " s'est déconnecté");
         }
+        // Always rebroadcast so lobby peers see the seat flip to disconnected; the seat stays reserved.
+        broadcast();
     }
 
     /**
@@ -418,6 +433,7 @@ public final class GameRoom {
         if (seat < 0) {
             return -1;
         }
+        cancelPendingTeardown();
         sessions[seat] = session;
         isBot[seat] = false;
         abandoned[seat] = false;
@@ -443,6 +459,63 @@ public final class GameRoom {
                 return false;
             }
         }
+        return true;
+    }
+
+    /** Host = lowest-seat connected human; -1 if none. Drives client-command gating and migration. */
+    public synchronized int hostSeat() {
+        for (int s = 0; s < playerCount; s++) {
+            if (!isBot[s] && sessions[s] != null) {
+                return s;
+            }
+        }
+        return -1;
+    }
+
+    public synchronized boolean isHost(int seat) {
+        return seat >= 0 && seat == hostSeat();
+    }
+
+    /**
+     * The last human dropped: defer teardown by a grace window instead of destroying the room at once,
+     * so a backgrounded host (or an invited joiner) can come back to the same code. The room and its
+     * reconnect entries survive the window; teardown only runs if nobody has returned by then.
+     */
+    public synchronized void scheduleTeardown(long graceMs, Runnable teardown) {
+        cancelPendingTeardown();
+        if (scheduler == null) {
+            return;
+        }
+        pendingTeardown = scheduler.schedule(() -> runTeardown(teardown), graceMs, TimeUnit.MILLISECONDS);
+    }
+
+    private synchronized void runTeardown(Runnable teardown) {
+        pendingTeardown = null;
+        if (isEmptyOfHumans()) {
+            teardown.run();
+        }
+    }
+
+    public synchronized void cancelPendingTeardown() {
+        if (pendingTeardown != null) {
+            pendingTeardown.cancel(false);
+            pendingTeardown = null;
+        }
+    }
+
+    /** A human intentionally leaves the lobby: the seat is fully freed for reuse. Lobby-only. */
+    public synchronized boolean leave(int seat) {
+        if (match != null || seat < 0 || seat >= playerCount || sessions[seat] == null) {
+            return false;
+        }
+        if (reconnectIndex != null) {
+            reconnectIndex.forget(userIds[seat], resumeTokens[seat], id);
+        }
+        sessions[seat] = null;
+        isBot[seat] = false;
+        names[seat] = "Player " + seat;
+        userIds[seat] = null;
+        resumeTokens[seat] = null;
         return true;
     }
 
@@ -759,9 +832,15 @@ public final class GameRoom {
         afterAdvance();
     }
 
+    // A seat is open for a new arrival only if it was never claimed. A disconnected human keeps a
+    // resume token, which reserves the seat for their reclaim instead of handing it to a joiner.
+    private boolean seatIsOpen(int seat) {
+        return !isBot[seat] && sessions[seat] == null && resumeTokens[seat] == null;
+    }
+
     private int firstFreeSeat() {
         for (int seat = 0; seat < playerCount; seat++) {
-            if (!isBot[seat] && sessions[seat] == null) {
+            if (seatIsOpen(seat)) {
                 return seat;
             }
         }
@@ -770,7 +849,7 @@ public final class GameRoom {
 
     private boolean isFull() {
         for (int seat = 0; seat < playerCount; seat++) {
-            if (!isBot[seat] && sessions[seat] == null) {
+            if (seatIsOpen(seat)) {
                 return false;
             }
         }
@@ -1071,7 +1150,10 @@ public final class GameRoom {
     private List<PlayerInfo> playersInfo() {
         List<PlayerInfo> players = new ArrayList<>();
         for (int seat = 0; seat < playerCount; seat++) {
-            String name = names[seat] == null ? "Empty" : names[seat];
+            // A seat is open (empty name) only if never claimed; a disconnected human keeps a resume
+            // token, so we still surface their name and let the client render them as disconnected.
+            boolean member = isBot[seat] || sessions[seat] != null || resumeTokens[seat] != null;
+            String name = member && names[seat] != null ? names[seat] : "";
             boolean connected = sessions[seat] != null && sessions[seat].isOpen();
             players.add(new PlayerInfo(seat, name, isBot[seat], connected));
         }
