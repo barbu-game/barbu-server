@@ -300,4 +300,17 @@ class MontanteRulesTest {
         assertEquals(0, s3.get(2));
         assertEquals(-30, s3.get(1));
     }
+
+    @Test
+    void running_score_locks_only_seats_that_have_finished() {
+        List<List<Card>> hands = List.of(
+                List.of(), // seat 0: finished (2nd to empty)
+                List.of(c(Suit.SPADES, Rank.NINE)),
+                List.of(), // seat 2: finished (1st to empty)
+                List.of(c(Suit.HEARTS, Rank.TEN)),
+                List.of(c(Suit.CLUBS, Rank.JACK)));
+        MontanteState state = new MontanteState(hands, MontanteBoard.empty(), List.of(2, 0), 0, 1);
+        // montanteRanking(5) = [30, 15, 0, -15, -30]; seat 2 finished first (+30), seat 0 second (+15).
+        assertArrayEquals(new int[] {15, 0, 30, 0, 0}, MontanteRules.runningScore(state));
+    }
 }

@@ -108,6 +108,38 @@ class GameRoomTest {
     }
 
     @Test
+    void round_scores_are_exposed_during_the_montante() {
+        // An inline scheduler drives the all-bot game one action at a time (delay 0 → no pauses), so the
+        // brief montante window is observed deterministically instead of being raced against wall-clock.
+        InlineScheduler scheduler = new InlineScheduler();
+        try {
+            GameRoom room = new GameRoom("MNTSC", 3, Variants.DEVELOPER, new ObjectMapper(), scheduler, 0, null, null);
+            assertTrue(room.addBot());
+            assertTrue(room.addBot());
+            assertTrue(room.addBot());
+            assertTrue(room.start(42L));
+
+            GameStateMessage montante = null;
+            int guard = 0;
+            while (scheduler.step() && guard++ < 200_000) {
+                GameStateMessage v = room.viewFor(0);
+                if ("MONTANTE".equals(v.contract())) {
+                    montante = v;
+                    break;
+                }
+            }
+            assertNotNull(montante, "expected to observe the montante in progress");
+            assertNotNull(montante.roundScores(), "roundScores must be exposed during the montante");
+            assertEquals(3, montante.roundScores().size(), "roundScores is indexed by seat");
+            for (int p : montante.roundScores()) {
+                assertTrue(p >= -30 && p <= 30, "montante running score out of range: " + p);
+            }
+        } finally {
+            scheduler.shutdownNow();
+        }
+    }
+
+    @Test
     void bots_are_numbered_by_count_not_by_seat() {
         ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
         try {

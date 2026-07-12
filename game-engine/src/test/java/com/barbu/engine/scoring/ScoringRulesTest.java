@@ -202,4 +202,25 @@ class ScoringRulesTest {
                 List.of(new CardPenalty(Card::isHeart, -2, "heart"), new CardPenalty(Card::isQueen, -6, "queen")));
         assertTrue(onlyCardPenalties.exhausted(noPenaltyCards));
     }
+
+    @Test
+    void last_tricks_running_score_locks_only_the_true_final_tricks() {
+        TrickScoringRule rule = new LastTricksPenalty(2, -10);
+        // 3 tricks played (takers 0,1,2), each seat still holds one card → one trick to come → 4 total.
+        // The last two tricks are absolute indices 2 and 3; only index 2 has been played.
+        TrickOutcome captured = new TrickOutcome(List.of(List.of(), List.of(), List.of()), List.of(0, 1, 2), 3);
+        List<List<Card>> remaining = List.of(
+                List.of(c(Suit.SPADES, Rank.TWO)),
+                List.of(c(Suit.SPADES, Rank.THREE)),
+                List.of(c(Suit.SPADES, Rank.FOUR)));
+        assertArrayEquals(new int[] {0, 0, -10}, rule.runningScore(captured, remaining));
+    }
+
+    @Test
+    void last_tricks_running_score_equals_final_when_hands_are_empty() {
+        TrickScoringRule rule = new LastTricksPenalty(2, -10);
+        TrickOutcome outcome = new TrickOutcome(List.of(List.of(), List.of(), List.of()), List.of(0, 1, 2, 0), 3);
+        List<List<Card>> emptyHands = List.of(List.of(), List.of(), List.of());
+        assertArrayEquals(rule.score(outcome), rule.runningScore(outcome, emptyHands));
+    }
 }

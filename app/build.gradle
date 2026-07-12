@@ -25,6 +25,7 @@ dependencies {
     implementation 'io.micronaut.flyway:micronaut-flyway'
     implementation 'io.micronaut.security:micronaut-security-jwt'
     implementation 'io.micronaut:micronaut-management'
+    implementation 'io.micronaut.redis:micronaut-redis-lettuce'
     implementation 'io.micronaut.micrometer:micronaut-micrometer-registry-prometheus'
     implementation 'at.favre.lib:bcrypt:0.10.2'
 
@@ -37,7 +38,26 @@ dependencies {
     testImplementation 'io.micronaut:micronaut-http-client'
     testImplementation 'io.micronaut.test:micronaut-test-junit5'
     testImplementation 'org.junit.jupiter:junit-jupiter'
+    testImplementation 'net.jqwik:jqwik:1.8.4'
+    testImplementation 'org.testcontainers:testcontainers:1.20.4'
+    testImplementation 'org.testcontainers:junit-jupiter:1.20.4'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+test {
+    useJUnitPlatform {
+        includeEngines 'junit-jupiter', 'jqwik'
+    }
+    // Bridge a non-standard local Docker socket (e.g. OrbStack) to Testcontainers workers when set;
+    // absent on CI, where the default socket and API version already satisfy Testcontainers.
+    ['DOCKER_HOST', 'DOCKER_API_VERSION', 'TESTCONTAINERS_RYUK_DISABLED'].each { key ->
+        if (System.getenv(key)) {
+            environment key, System.getenv(key)
+        }
+    }
+    if (System.getenv('DOCKER_API_VERSION')) {
+        systemProperty 'api.version', System.getenv('DOCKER_API_VERSION')
+    }
 }
 
 application {

@@ -82,6 +82,21 @@ public final class MontanteRules {
         return result;
     }
 
+    /**
+     * Points locked so far: a seat that has emptied its hand holds a final place, so its montante gain
+     * is fixed the moment it finishes; seats still in play score 0. Agrees with {@link #score} on every
+     * seat already in {@code finishingOrder} and reaches the zero-sum total once the round is settled.
+     */
+    public static int[] runningScore(MontanteState state) {
+        int[] ranking = ScoringConfig.montanteRanking(state.playerCount());
+        int[] points = new int[state.playerCount()];
+        List<Integer> order = state.finishingOrder();
+        for (int place = 0; place < order.size(); place++) {
+            points[order.get(place)] = ranking[place];
+        }
+        return points;
+    }
+
     private static boolean canPlayAny(List<Card> hand, MontanteBoard board) {
         for (Card card : hand) {
             if (board.isPlayable(card)) {

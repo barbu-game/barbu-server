@@ -1,5 +1,7 @@
 package com.barbu.app.room;
 
+import com.barbu.app.cluster.RoomRegistry;
+import com.barbu.app.cluster.SnapshotStore;
 import com.barbu.app.persistence.MatchRecorder;
 import com.barbu.app.rating.RatingService;
 import com.barbu.engine.variant.Variant;
@@ -8,10 +10,12 @@ import io.micronaut.context.annotation.Value;
 import jakarta.annotation.PreDestroy;
 import jakarta.inject.Singleton;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 @Singleton
 public class RoomManager {
@@ -28,6 +32,12 @@ public class RoomManager {
     private final long turnTimeoutMs;
     private final int turnTimeoutStrikes;
     private final long roomGraceMs;
+    private final RoomRegistry registry;
+    private final SnapshotStore snapshots;
+    private final SnapshotCodec codec;
+    private final String podId;
+    private static final long LEASE_TTL_MS = 15_000;
+    private static final long RENEW_PERIOD_MS = 5_000;
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
     private final Random random = new Random();
 
@@ -37,6 +47,10 @@ public class RoomManager {
             com.barbu.app.metrics.GameMetrics metrics,
             RatingService ratingService,
             ReconnectIndex reconnectIndex,
+            RoomRegistry registry,
+            SnapshotStore snapshots,
+            SnapshotCodec codec,
+            @Value("${POD_ID:local}") String podId,
             @Value("${barbu.bot-delay-ms:650}") long botDelayMs,
             @Value("${barbu.turn-timeout-ms:60000}") long turnTimeoutMs,
             @Value("${barbu.turn-timeout-strikes:2}") int turnTimeoutStrikes,
@@ -46,10 +60,15 @@ public class RoomManager {
         this.metrics = metrics;
         this.ratingService = ratingService;
         this.reconnectIndex = reconnectIndex;
+        this.registry = registry;
+        this.snapshots = snapshots;
+        this.codec = codec;
+        this.podId = podId;
         this.botDelayMs = botDelayMs;
         this.turnTimeoutMs = turnTimeoutMs;
         this.turnTimeoutStrikes = turnTimeoutStrikes;
         this.roomGraceMs = roomGraceMs;
+        scheduler.scheduleAtFixedRate(this::renewLeases, RENEW_PERIOD_MS, RENEW_PERIOD_MS, TimeUnit.MILLISECONDS);
     }
 
     public GameRoom create(int requestedPlayerCount, Variant variant) {
@@ -74,7 +93,22 @@ public class RoomManager {
                 turnTimeoutMs,
                 turnTimeoutStrikes);
         rooms.put(id, room);
+        registry.tryClaim(id, podId, LEASE_TTL_MS);
+        room.setOnStateChanged(() -> persist(room));
+        persist(room);
         return room;
+    }
+
+    /** Écrit le snapshot durable et prolonge notre lease : appelé à chaque changement d'état de la table. */
+    public void persist(GameRoom room) {
+        snapshots.save(room.id(), codec.encode(room.snapshot()));
+        registry.renew(room.id(), podId, LEASE_TTL_MS);
+    }
+
+    private void renewLeases() {
+        for (String id : rooms.keySet()) {
+            registry.renew(id, podId, LEASE_TTL_MS);
+        }
     }
 
     public GameRoom get(String id) {
@@ -89,12 +123,68 @@ public class RoomManager {
         return get(reconnectIndex.roomForToken(token));
     }
 
+    public String roomIdForToken(String token) {
+        return reconnectIndex.roomForToken(token);
+    }
+
+    public String roomIdForUser(long userId) {
+        return reconnectIndex.roomForUser(userId);
+    }
+
+    public enum Resolution {
+        LOCAL,
+        REDIRECT,
+        NONE
+    }
+
+    public record Resolved(Resolution resolution, GameRoom room, String ownerPod) {}
+
+    /**
+     * Résout où vit une table. Possédée localement → LOCAL. Sinon possédée par un autre pod vivant →
+     * REDIRECT vers lui. Sinon, si un snapshot durable existe → on la réclame et on la réhydrate
+     * localement (self-healing sur perte de pod). Sinon → NONE.
+     */
+    public Resolved resolveOrRehydrate(String roomId) {
+        GameRoom local = rooms.get(roomId);
+        if (local != null) {
+            return new Resolved(Resolution.LOCAL, local, podId);
+        }
+        Optional<String> owner = registry.ownerOf(roomId);
+        if (owner.isPresent() && !owner.get().equals(podId)) {
+            return new Resolved(Resolution.REDIRECT, null, owner.get());
+        }
+        Optional<String> json = snapshots.load(roomId);
+        if (json.isEmpty()) {
+            return new Resolved(Resolution.NONE, null, null);
+        }
+        if (!registry.tryClaim(roomId, podId, LEASE_TTL_MS)) {
+            return new Resolved(
+                    Resolution.REDIRECT, null, registry.ownerOf(roomId).orElse(null));
+        }
+        GameRoom room = GameRoom.fromSnapshot(
+                codec.decode(json.get()),
+                mapper,
+                scheduler,
+                botDelayMs,
+                recorder,
+                metrics,
+                ratingService,
+                reconnectIndex,
+                turnTimeoutMs,
+                turnTimeoutStrikes);
+        room.setOnStateChanged(() -> persist(room));
+        rooms.put(roomId, room);
+        return new Resolved(Resolution.LOCAL, room, podId);
+    }
+
     public void remove(String id) {
         GameRoom room = rooms.remove(id);
         if (room != null) {
             room.cancelPendingTeardown();
             room.clearReconnectEntries(reconnectIndex);
         }
+        snapshots.delete(id);
+        registry.release(id, podId);
     }
 
     /**

@@ -25,6 +25,7 @@ import com.barbu.engine.match.MatchEngine;
 import com.barbu.engine.match.MatchState;
 import com.barbu.engine.model.DefaultMove;
 import com.barbu.engine.model.Move;
+import com.barbu.engine.round.MontanteRules;
 import com.barbu.engine.round.MontanteState;
 import com.barbu.engine.round.RoundEngine;
 import com.barbu.engine.round.RoundResult;
@@ -33,6 +34,7 @@ import com.barbu.engine.round.Trick;
 import com.barbu.engine.round.TrickTakingState;
 import com.barbu.engine.scoring.TrickOutcome;
 import com.barbu.engine.variant.Variant;
+import com.barbu.engine.variant.Variants;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micronaut.websocket.WebSocketSession;
 import java.util.ArrayList;
@@ -172,6 +174,75 @@ public final class GameRoom {
 
     public String id() {
         return id;
+    }
+
+    private Runnable onStateChanged = () -> {};
+
+    /** Hook de persistance appelé après chaque changement d'état (câblé par le {@link RoomManager}). */
+    public synchronized void setOnStateChanged(Runnable hook) {
+        this.onStateChanged = hook == null ? () -> {} : hook;
+    }
+
+    public synchronized GameSnapshot snapshot() {
+        return new GameSnapshot(
+                id,
+                playerCount,
+                variant.id(),
+                mode,
+                names.clone(),
+                isBot.clone(),
+                userIds.clone(),
+                resumeTokens.clone(),
+                stopped,
+                match);
+    }
+
+    /**
+     * Reconstruit une room à partir d'un snapshot durable : sièges et état moteur restaurés, sessions
+     * WS nulles (reconstruites au reclaim), bots et timer de tour recréés au premier {@code resume()}
+     * déclenché par une reconnexion.
+     */
+    public static GameRoom fromSnapshot(
+            GameSnapshot snap,
+            ObjectMapper mapper,
+            ScheduledExecutorService scheduler,
+            long botDelayMs,
+            MatchRecorder recorder,
+            com.barbu.app.metrics.GameMetrics metrics,
+            RatingService ratingService,
+            ReconnectIndex reconnectIndex,
+            long turnTimeoutMs,
+            int turnTimeoutStrikes) {
+        GameRoom room = new GameRoom(
+                snap.roomId(),
+                snap.playerCount(),
+                Variants.byId(snap.variantId()),
+                mapper,
+                scheduler,
+                botDelayMs,
+                recorder,
+                metrics,
+                snap.mode(),
+                ratingService,
+                reconnectIndex,
+                turnTimeoutMs,
+                turnTimeoutStrikes);
+        room.restoreState(snap);
+        return room;
+    }
+
+    private synchronized void restoreState(GameSnapshot snap) {
+        System.arraycopy(snap.names(), 0, names, 0, playerCount);
+        System.arraycopy(snap.isBot(), 0, isBot, 0, playerCount);
+        System.arraycopy(snap.userIds(), 0, userIds, 0, playerCount);
+        System.arraycopy(snap.resumeTokens(), 0, resumeTokens, 0, playerCount);
+        this.stopped = snap.stopped();
+        this.match = snap.match();
+        if (reconnectIndex != null) {
+            for (int s = 0; s < playerCount; s++) {
+                reconnectIndex.register(userIds[s], resumeTokens[s], id);
+            }
+        }
     }
 
     public synchronized int connectedHumanCount() {
@@ -871,6 +942,7 @@ public final class GameRoom {
             }
         }
         maybeRecord();
+        onStateChanged.run();
     }
 
     /** Envoie le même payload à toutes les sessions ouvertes (pas de rédaction par siège). */
@@ -1071,6 +1143,12 @@ public final class GameRoom {
                         captured = capturedPerSeat(t);
                     } else if (round instanceof MontanteState m) {
                         board = Codec.boardView(m.board());
+                        int[] running = MontanteRules.runningScore(m);
+                        List<Integer> rs = new ArrayList<>();
+                        for (int s = 0; s < playerCount; s++) {
+                            rs.add(running[s]);
+                        }
+                        roundScores = rs;
                     }
 
                     if (trickResolving) {

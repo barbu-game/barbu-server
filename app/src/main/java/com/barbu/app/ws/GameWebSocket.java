@@ -4,6 +4,7 @@ import com.barbu.app.auth.JwtVerifier;
 import com.barbu.app.persistence.Repositories.UserRepository;
 import com.barbu.app.protocol.ChatSend;
 import com.barbu.app.protocol.Codec;
+import com.barbu.app.protocol.Redirect;
 import com.barbu.app.protocol.ResumeCommand;
 import com.barbu.app.room.CasualMatchmaker;
 import com.barbu.app.room.GameRoom;
@@ -199,16 +200,29 @@ public class GameWebSocket {
                 ResumeCommand cmd = mapper.convertValue(command, ResumeCommand.class);
                 Long userId = accountId(session);
                 String resumeToken = cmd.resumeToken();
-                GameRoom room = resumeToken != null
-                        ? rooms.roomForToken(resumeToken)
-                        : (userId != null ? rooms.roomForUser(userId) : null);
-                int seat = room == null ? -1 : room.reclaim(session, userId, resumeToken);
+                String roomId = resumeToken != null
+                        ? rooms.roomIdForToken(resumeToken)
+                        : (userId != null ? rooms.roomIdForUser(userId) : null);
+                if (roomId == null) {
+                    send(session, Map.of("type", "resumeUnavailable"));
+                    return;
+                }
+                RoomManager.Resolved resolved = rooms.resolveOrRehydrate(roomId);
+                if (resolved.resolution() == RoomManager.Resolution.REDIRECT) {
+                    send(session, mapper.convertValue(Redirect.to(roomId, resolved.ownerPod()), Map.class));
+                    return;
+                }
+                if (resolved.resolution() == RoomManager.Resolution.NONE) {
+                    send(session, Map.of("type", "resumeUnavailable"));
+                    return;
+                }
+                int seat = resolved.room().reclaim(session, userId, resumeToken);
                 if (seat < 0) {
                     send(session, Map.of("type", "resumeUnavailable"));
                     return;
                 }
-                bind(session, room.id(), seat);
-                sendJoined(session, room.id(), seat);
+                bind(session, roomId, seat);
+                sendJoined(session, roomId, seat);
             }
             default -> sendError(session, "unknown command: " + type);
         }
