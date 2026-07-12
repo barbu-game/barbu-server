@@ -111,6 +111,13 @@ public class RoomManager {
         }
     }
 
+    /** Relâche immédiatement tous les leases possédés (drain) : un survivant peut réclamer sans attendre le TTL. */
+    public void releaseAllLeases() {
+        for (String id : rooms.keySet()) {
+            registry.release(id, podId);
+        }
+    }
+
     public GameRoom get(String id) {
         return id == null ? null : rooms.get(id);
     }
