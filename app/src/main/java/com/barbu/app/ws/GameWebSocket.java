@@ -6,9 +6,8 @@ import com.barbu.app.protocol.ChatSend;
 import com.barbu.app.protocol.Codec;
 import com.barbu.app.protocol.Redirect;
 import com.barbu.app.protocol.ResumeCommand;
-import com.barbu.app.room.CasualMatchmaker;
 import com.barbu.app.room.GameRoom;
-import com.barbu.app.room.RankedMatchmaker;
+import com.barbu.app.room.MatchmakingCoordinator;
 import com.barbu.app.room.RoomManager;
 import com.barbu.engine.variant.Variant;
 import com.barbu.engine.variant.Variants;
@@ -27,22 +26,19 @@ import java.util.Map;
 public class GameWebSocket {
 
     private final RoomManager rooms;
-    private final CasualMatchmaker matchmaker;
-    private final RankedMatchmaker rankedMatchmaker;
+    private final MatchmakingCoordinator coordinator;
     private final JwtVerifier jwtVerifier;
     private final UserRepository users;
     private final ObjectMapper mapper;
 
     public GameWebSocket(
             RoomManager rooms,
-            CasualMatchmaker matchmaker,
-            RankedMatchmaker rankedMatchmaker,
+            MatchmakingCoordinator coordinator,
             JwtVerifier jwtVerifier,
             UserRepository users,
             ObjectMapper mapper) {
         this.rooms = rooms;
-        this.matchmaker = matchmaker;
-        this.rankedMatchmaker = rankedMatchmaker;
+        this.coordinator = coordinator;
         this.jwtVerifier = jwtVerifier;
         this.users = users;
         this.mapper = mapper;
@@ -122,16 +118,13 @@ public class GameWebSocket {
                         sendError(session, "account required for ranked");
                         return;
                     }
-                    rankedMatchmaker.enqueue(session, accountNameOr(session, command.get("name")), 0);
+                    coordinator.enqueueRanked(session, accountNameOr(session, command.get("name")));
                 } else {
-                    matchmaker.enqueue(
+                    coordinator.enqueueCasual(
                             session, accountNameOr(session, command.get("name")), asInt(command.get("size"), 4));
                 }
             }
-            case "cancelMatchmaking" -> {
-                matchmaker.cancel(session);
-                rankedMatchmaker.cancel(session);
-            }
+            case "cancelMatchmaking" -> coordinator.cancel(session);
             case "addBot" ->
                 withRoomSeat(session, (room, seat) -> {
                     if (!room.isHost(seat)) {
@@ -230,8 +223,7 @@ public class GameWebSocket {
 
     @OnClose
     public void onClose(WebSocketSession session) {
-        matchmaker.cancel(session);
-        rankedMatchmaker.cancel(session);
+        coordinator.cancel(session);
         String roomId = session.get("roomId", String.class).orElse(null);
         Integer seat = session.get("seat", Integer.class).orElse(null);
         if (roomId == null || seat == null) {

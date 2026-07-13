@@ -1,124 +1,26 @@
 package com.barbu.app.room;
 
 import com.barbu.app.rating.EloConfig;
-import com.barbu.app.rating.RatingService;
-import com.barbu.engine.variant.Variants;
-import io.micronaut.websocket.WebSocketSession;
-import jakarta.annotation.PostConstruct;
-import jakarta.annotation.PreDestroy;
-import jakarta.inject.Singleton;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.Deque;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
-import java.util.function.LongSupplier;
 
 /**
- * File ranked : taille de table fixe (config), fenêtre de rating qui s'élargit avec l'attente,
- * bot-fill borné aux tables faible-ELO après timeout. La décision de formation est pure et testée
- * en isolation ; le wrapper {@code @Singleton} l'habille avec les sessions et la création de room.
+ * Décision de matchmaking ranked, pure et testable : d'abord une table 100% humaine dont l'écart de
+ * rating tient dans une fenêtre commune qui s'élargit avec l'attente ; sinon un bot-fill borné aux
+ * tables faible-ELO ayant assez patienté. Le wrapping (sessions, rating, création de room) vit dans
+ * {@link MatchmakingCoordinator}.
  */
-@Singleton
-public class RankedMatchmaker implements Matchmaker {
+public final class RankedMatchmaker {
 
-    /** Un joueur en attente, anonymisé pour la décision pure. */
+    private RankedMatchmaker() {}
+
+    /** Un joueur en attente, anonymisé pour la décision. Les indices renvoyés référencent {@code waiting}. */
     public record Candidate(int rating, long enqueuedAt) {}
 
     /** Résultat : les indices (dans la liste d'attente) à asseoir, et le nombre de bots à ajouter. */
     public record Formation(List<Integer> indices, int botsToAdd) {}
-
-    private final RoomManager rooms;
-    private final RatingService ratingService;
-    private final EloConfig config;
-    private final LongSupplier clock;
-    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
-    private final Deque<Waiting> waiting = new ArrayDeque<>();
-
-    private record Waiting(WebSocketSession session, String name, long userId, int rating, long enqueuedAt) {}
-
-    public RankedMatchmaker(RoomManager rooms, RatingService ratingService, EloConfig config) {
-        this.rooms = rooms;
-        this.ratingService = ratingService;
-        this.config = config;
-        this.clock = System::currentTimeMillis;
-    }
-
-    @PostConstruct
-    void startTicker() {
-        scheduler.scheduleAtFixedRate(this::tick, 1, 1, TimeUnit.SECONDS);
-    }
-
-    @PreDestroy
-    void shutdown() {
-        scheduler.shutdownNow();
-    }
-
-    @Override
-    public synchronized void enqueue(WebSocketSession session, String name, int desiredSize) {
-        Long userId = session.get("userId", Long.class).orElse(null);
-        if (userId == null) {
-            return; // ranked exige un compte ; le WebSocket a déjà renvoyé l'erreur
-        }
-        // Idempotent par compte : clics répétés ou second onglet ne créent qu'un seul siège en file
-        // (sinon un même compte pouvait se retrouver assis plusieurs fois à la même table).
-        if (waiting.stream().anyMatch(w -> w.userId() == userId)) {
-            return;
-        }
-        session.put("mmRanked", true);
-        waiting.add(new Waiting(session, name, userId, ratingService.ratingOf(userId), clock.getAsLong()));
-        tryForm();
-    }
-
-    @Override
-    public synchronized void cancel(WebSocketSession session) {
-        waiting.removeIf(w -> w.session() == session);
-    }
-
-    @Override
-    public synchronized int queuedCount() {
-        return waiting.size();
-    }
-
-    private synchronized void tick() {
-        tryForm();
-    }
-
-    private synchronized void tryForm() {
-        if (waiting.isEmpty()) {
-            return;
-        }
-        List<Waiting> snapshot = new ArrayList<>(waiting);
-        List<Candidate> candidates = new ArrayList<>(snapshot.size());
-        for (Waiting w : snapshot) {
-            candidates.add(new Candidate(w.rating(), w.enqueuedAt()));
-        }
-        Optional<Formation> decision = decideFormation(candidates, clock.getAsLong(), config);
-        if (decision.isEmpty()) {
-            return;
-        }
-        Formation f = decision.get();
-        List<Waiting> seated = new ArrayList<>();
-        for (int idx : f.indices()) {
-            seated.add(snapshot.get(idx));
-        }
-        waiting.removeAll(seated);
-
-        GameRoom room = rooms.create(config.rankedTableSize(), Variants.DEVELOPER, "ranked");
-        for (Waiting w : seated) {
-            int seat = room.addHuman(w.session(), w.name(), w.userId());
-            w.session().put("roomId", room.id());
-            w.session().put("seat", seat);
-        }
-        for (int b = 0; b < f.botsToAdd(); b++) {
-            room.addBot();
-        }
-        room.start(rooms.newSeed());
-    }
 
     /** Fenêtre de rating acceptable pour un candidat selon son temps d'attente. */
     private static int window(Candidate c, long now, EloConfig cfg) {

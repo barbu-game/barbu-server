@@ -283,6 +283,31 @@ public final class GameRoom {
         return seat;
     }
 
+    /**
+     * Réserve le prochain siège libre pour un joueur pas encore connecté à ce pod : token de reprise
+     * frais + entrée d'index, mais {@code sessions[seat] == null}. Le joueur prend le siège au
+     * {@code reclaim} (via {@code resume}) ; en attendant, l'état est celui d'une déconnexion à t=0
+     * (bot de substitution après strikes). Utilisé par le matchmaking pour asseoir un joueur d'un
+     * autre pod. Renvoie le resume token, ou {@code null} si la table est pleine.
+     */
+    public synchronized String reserveHuman(String name, Long userId) {
+        cancelPendingTeardown();
+        int seat = firstFreeSeat();
+        if (seat < 0) {
+            return null;
+        }
+        sessions[seat] = null;
+        String normalized = PlayerNames.normalizeGuest(name);
+        names[seat] = normalized == null ? "Player " + seat : normalized;
+        userIds[seat] = userId;
+        isBot[seat] = false;
+        resumeTokens[seat] = UUID.randomUUID().toString();
+        if (reconnectIndex != null) {
+            reconnectIndex.register(userId, resumeTokens[seat], id);
+        }
+        return resumeTokens[seat];
+    }
+
     public synchronized boolean addBot() {
         if (match != null) {
             return false;
