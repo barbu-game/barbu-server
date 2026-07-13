@@ -10,6 +10,7 @@ public class GameMetrics {
 
     private final Counter gamesStarted;
     private final Counter gamesFinished;
+    private final Counter rehydrations;
 
     public GameMetrics(MeterRegistry registry) {
         this.gamesStarted = Counter.builder("barbu.games.started")
@@ -17,6 +18,9 @@ public class GameMetrics {
                 .register(registry);
         this.gamesFinished = Counter.builder("barbu.games.finished")
                 .description("Games finished (completed or stopped)")
+                .register(registry);
+        this.rehydrations = Counter.builder("barbu.rehydrations")
+                .description("Tables rehydrated from a durable snapshot after owner loss")
                 .register(registry);
     }
 
@@ -26,5 +30,9 @@ public class GameMetrics {
 
     public void gameFinished() {
         gamesFinished.increment();
+    }
+
+    public void rehydrated() {
+        rehydrations.increment();
     }
 }

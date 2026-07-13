@@ -5,6 +5,7 @@ import com.barbu.engine.round.RoundState;
 import com.barbu.engine.round.TrickTakingState;
 import com.barbu.engine.variant.Variant;
 import com.barbu.engine.variant.Variants;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.core.JsonGenerator;
@@ -40,6 +41,10 @@ public class SnapshotCodec {
         // Les états de manche exposent des accesseurs dérivés (isComplete, playerCount…) qui n'ont pas
         // de composant de record correspondant : on les ignore à la relecture (purs, recalculés).
         this.mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        // Toujours sérialiser les collections vides : les records du moteur (MatchState.playedByDealer,
+        // history, hands…) font List/Set.copyOf en constructeur compact → un champ omis (inclusion
+        // NON_EMPTY de l'ObjectMapper applicatif) revient null et lève une NPE à la relecture.
+        this.mapper.setSerializationInclusion(JsonInclude.Include.ALWAYS);
     }
 
     public String encode(GameSnapshot snapshot) {

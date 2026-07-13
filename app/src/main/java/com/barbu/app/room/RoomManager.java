@@ -181,6 +181,9 @@ public class RoomManager {
                 turnTimeoutStrikes);
         room.setOnStateChanged(() -> persist(room));
         rooms.put(roomId, room);
+        if (metrics != null) {
+            metrics.rehydrated();
+        }
         return new Resolved(Resolution.LOCAL, room, podId);
     }
 
