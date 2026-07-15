@@ -78,19 +78,30 @@ class MatchmakingChaosTest {
                     mb.path("roomId").asText(),
                     "players enqueued on different pods land in the SAME room (queue is global)");
 
-            // Le client se branche sur le pod propriétaire et réclame son siège réservé.
-            String ownerPod = ma.path("pod").asText();
-            EmbeddedServer owner = serverForPod(ownerPod, a, "pod-A", b, "pod-B");
-            assertNotNull(owner, "owner pod is one of the two instances");
-            TestGameClient onOwner = connect(owner);
-            onOwner.sendJson(Map.of(
+            // Alice réclame son siège réservé. Si la table vit sur l'AUTRE pod, `matched` porte `pod` et
+            // elle s'y rebranche ; si elle vit sur son propre pod (leader = pod-A), `pod` est omis et elle
+            // réclame sur sa connexion courante — exactement le contrat que suit le client navigateur.
+            TestGameClient reclaimer;
+            boolean reclaimerIsNew;
+            if (ma.has("pod")) {
+                EmbeddedServer owner = serverForPod(ma.path("pod").asText(), a, "pod-A", b, "pod-B");
+                assertNotNull(owner, "owner pod is one of the two instances");
+                reclaimer = connect(owner);
+                reclaimerIsNew = true;
+            } else {
+                reclaimer = ca;
+                reclaimerIsNew = false;
+            }
+            reclaimer.sendJson(Map.of(
                     "type", "resume", "resumeToken", ma.path("resumeToken").asText()));
-            JsonNode joined = onOwner.await(m -> m.path("type").asText().equals("joined"));
+            JsonNode joined = reclaimer.await(m -> m.path("type").asText().equals("joined"));
             assertEquals(ma.path("roomId").asText(), joined.path("roomId").asText());
 
             ca.close();
             cb.close();
-            onOwner.close();
+            if (reclaimerIsNew) {
+                reclaimer.close();
+            }
         } finally {
             a.stop();
             b.stop();

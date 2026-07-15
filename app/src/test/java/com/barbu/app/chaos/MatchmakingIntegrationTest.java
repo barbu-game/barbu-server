@@ -35,6 +35,10 @@ class MatchmakingIntegrationTest {
                     matchedA.path("roomId").asText(),
                     matchedB.path("roomId").asText(),
                     "both are matched into the same room");
+            // Table réservée sur ce même pod : pas de champ `pod`, donc pas de redirection /pod/<pod>
+            // (le préfixe n'existe que derrière Traefik en multi-pod). Le client réclame son siège en
+            // place — c'est ce qui casse le matchmaking navigateur en mono-instance quand `pod` est émis.
+            assertFalse(matchedA.has("pod"), "same-pod match must not ask the client to switch pods");
 
             a.sendJson(Map.of(
                     "type",

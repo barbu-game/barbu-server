@@ -13,6 +13,7 @@ import io.micronaut.context.annotation.Value;
 import io.micronaut.websocket.WebSocketSession;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -153,13 +154,18 @@ public class MatchmakingCoordinator {
                 WebSocketSession session = localSessions.remove(entryId);
                 Assignment a = assignment.get();
                 if (session != null) {
-                    send(
-                            session,
-                            Map.of(
-                                    "type", "matched",
-                                    "roomId", a.roomId(),
-                                    "pod", a.ownerPod(),
-                                    "resumeToken", a.resumeToken()));
+                    Map<String, Object> matched = new HashMap<>();
+                    matched.put("type", "matched");
+                    matched.put("roomId", a.roomId());
+                    matched.put("resumeToken", a.resumeToken());
+                    // `pod` uniquement quand la table vit sur un AUTRE pod que celui du client : il doit
+                    // alors s'y rebrancher via /pod/<pod> (routé par Traefik). Sur le même pod (mono-
+                    // instance incluse), on l'omet et le client réclame son siège sur le socket courant —
+                    // sinon /pod/<pod> pointe vers une route inexistante hors cluster.
+                    if (!a.ownerPod().equals(podId)) {
+                        matched.put("pod", a.ownerPod());
+                    }
+                    send(session, matched);
                 }
             }
         }
