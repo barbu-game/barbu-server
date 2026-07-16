@@ -48,6 +48,9 @@ test {
     useJUnitPlatform {
         includeEngines 'junit-jupiter', 'jqwik'
     }
+    // Tests boot the full server with security enabled; production injects JWT_SECRET, so supply a
+    // throwaway signing secret here (never a real one) to let the context start under test.
+    environment 'JWT_SECRET', System.getenv('JWT_SECRET') ?: 'test-only-secret-not-for-production-at-least-256-bits-long-0123456789'
     // Bridge a non-standard local Docker socket (e.g. OrbStack) to Testcontainers workers when set;
     // absent on CI, where the default socket and API version already satisfy Testcontainers.
     ['DOCKER_HOST', 'DOCKER_API_VERSION', 'TESTCONTAINERS_RYUK_DISABLED'].each { key ->
