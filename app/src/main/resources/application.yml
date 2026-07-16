@@ -1,6 +1,11 @@
 micronaut:
   application:
     name: barbu
+  # Our own /health controller replaces the management health endpoint (disabled under `endpoints`),
+  # which removes the HealthAggregator bean the periodic monitor would need — so turn the monitor off.
+  health:
+    monitor:
+      enabled: false
   server:
     port: 8080
     cors:
