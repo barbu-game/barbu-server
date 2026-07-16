@@ -6,7 +6,7 @@ import io.micronaut.context.annotation.Requires;
 import jakarta.inject.Singleton;
 import java.util.Optional;
 
-/** Stockage de snapshots partagé entre pods (actif dès que {@code redis.uri} est fourni). */
+/** Snapshot store shared across pods (active as soon as {@code redis.uri} is provided). */
 @Singleton
 @Requires(property = "redis.uri")
 public class RedisSnapshotStore implements SnapshotStore {

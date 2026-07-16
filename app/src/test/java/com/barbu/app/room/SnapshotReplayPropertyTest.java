@@ -15,9 +15,9 @@ class SnapshotReplayPropertyTest {
     private final SnapshotCodec codec = new SnapshotCodec(new ObjectMapper());
 
     /**
-     * decode∘encode est un inverse fidèle : re-sérialiser un snapshot désérialisé redonne le JSON
-     * canonique d'origine. On déale le premier contrat pour exercer un vrai {@code TrickTakingState}
-     * (mains, pli courant, plis capturés) sur toutes les tailles de table.
+     * decode∘encode is a faithful inverse: re-serializing a deserialized snapshot yields the original
+     * canonical JSON. We deal the first contract to exercise a real {@code TrickTakingState} (hands,
+     * current trick, captured tricks) over all table sizes.
      */
     @Property(tries = 200)
     void snapshot_round_trip_is_json_stable(@ForAll @IntRange(min = 2, max = 10) int players, @ForAll long seed) {

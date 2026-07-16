@@ -1,8 +1,8 @@
 package com.barbu.app.rating;
 
 /**
- * Paramètres ajustables du classement ELO et du matchmaking ranked. Record pur (aucune
- * dépendance Micronaut) pour rester injectable dans le calcul testé en isolation.
+ * Tunable parameters for ELO rating and ranked matchmaking. Pure record (no Micronaut dependency)
+ * so it stays injectable into the computation tested in isolation.
  */
 public record EloConfig(
         int initialRating,

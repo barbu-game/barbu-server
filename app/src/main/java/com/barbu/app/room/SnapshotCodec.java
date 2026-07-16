@@ -21,10 +21,10 @@ import jakarta.inject.Singleton;
 import java.io.IOException;
 
 /**
- * Sérialise l'état d'une table en JSON pour Redis. Le moteur reste pur (sans Jackson) : les deux
- * points polymorphes sont traités ici, hors du moteur — un {@link Variant} est réduit à son id
- * (reconstruit via {@link Variants#byId}), et {@link RoundState} (interface scellée) porte un
- * discriminant de type via mixin.
+ * Serializes a table's state to JSON for Redis. The engine stays pure (without Jackson): the two
+ * polymorphic points are handled here, outside the engine — a {@link Variant} is reduced to its id
+ * (rebuilt via {@link Variants#byId}), and {@link RoundState} (sealed interface) carries a type
+ * discriminant via mixin.
  */
 @Singleton
 public class SnapshotCodec {
@@ -38,12 +38,12 @@ public class SnapshotCodec {
         module.addDeserializer(Variant.class, new VariantDeserializer());
         this.mapper.registerModule(module);
         this.mapper.addMixIn(RoundState.class, RoundStateMixin.class);
-        // Les états de manche exposent des accesseurs dérivés (isComplete, playerCount…) qui n'ont pas
-        // de composant de record correspondant : on les ignore à la relecture (purs, recalculés).
+        // Round states expose derived accessors (isComplete, playerCount…) that have no corresponding
+        // record component: we ignore them on read-back (pure, recomputed).
         this.mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-        // Toujours sérialiser les collections vides : les records du moteur (MatchState.playedByDealer,
-        // history, hands…) font List/Set.copyOf en constructeur compact → un champ omis (inclusion
-        // NON_EMPTY de l'ObjectMapper applicatif) revient null et lève une NPE à la relecture.
+        // Always serialize empty collections: the engine records (MatchState.playedByDealer,
+        // history, hands…) do List/Set.copyOf in their compact constructor → an omitted field (NON_EMPTY
+        // inclusion of the application ObjectMapper) comes back null and throws an NPE on read-back.
         this.mapper.setSerializationInclusion(JsonInclude.Include.ALWAYS);
     }
 

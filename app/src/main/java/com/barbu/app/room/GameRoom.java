@@ -178,7 +178,7 @@ public final class GameRoom {
 
     private Runnable onStateChanged = () -> {};
 
-    /** Hook de persistance appelé après chaque changement d'état (câblé par le {@link RoomManager}). */
+    /** Persistence hook called after every state change (wired by the {@link RoomManager}). */
     public synchronized void setOnStateChanged(Runnable hook) {
         this.onStateChanged = hook == null ? () -> {} : hook;
     }
@@ -198,9 +198,9 @@ public final class GameRoom {
     }
 
     /**
-     * Reconstruit une room à partir d'un snapshot durable : sièges et état moteur restaurés, sessions
-     * WS nulles (reconstruites au reclaim), bots et timer de tour recréés au premier {@code resume()}
-     * déclenché par une reconnexion.
+     * Rebuilds a room from a durable snapshot: seats and engine state restored, WS sessions null
+     * (rebuilt on reclaim), bots and turn timer recreated on the first {@code resume()} triggered by
+     * a reconnection.
      */
     public static GameRoom fromSnapshot(
             GameSnapshot snap,
@@ -284,11 +284,11 @@ public final class GameRoom {
     }
 
     /**
-     * Réserve le prochain siège libre pour un joueur pas encore connecté à ce pod : token de reprise
-     * frais + entrée d'index, mais {@code sessions[seat] == null}. Le joueur prend le siège au
-     * {@code reclaim} (via {@code resume}) ; en attendant, l'état est celui d'une déconnexion à t=0
-     * (bot de substitution après strikes). Utilisé par le matchmaking pour asseoir un joueur d'un
-     * autre pod. Renvoie le resume token, ou {@code null} si la table est pleine.
+     * Reserves the next free seat for a player not yet connected to this pod: fresh resume token +
+     * index entry, but {@code sessions[seat] == null}. The player takes the seat on {@code reclaim}
+     * (via {@code resume}); in the meantime, the state is that of a disconnection at t=0 (substitute
+     * bot after strikes). Used by matchmaking to seat a player from another pod. Returns the resume
+     * token, or {@code null} if the table is full.
      */
     public synchronized String reserveHuman(String name, Long userId) {
         cancelPendingTeardown();
@@ -376,8 +376,8 @@ public final class GameRoom {
     }
 
     /**
-     * Un humain tape {@code /pause}. Le premier appel valide ouvre le vote (à une frontière
-     * entre manches uniquement) ; les suivants enregistrent les votes. Majorité stricte requise.
+     * A human types {@code /pause}. The first valid call opens the vote (at a between-rounds
+     * boundary only); the following ones record the votes. Strict majority required.
      */
     public synchronized void castPauseVote(int seat, boolean pause) {
         if (seat < 0 || seat >= playerCount || isBot[seat]) {
@@ -397,7 +397,7 @@ public final class GameRoom {
         }
     }
 
-    /** Un humain tape {@code /resume} : reprise anticipée si une pause est active. */
+    /** A human types {@code /resume}: early resume if a pause is active. */
     public synchronized void resumeGame(int seat) {
         if (!paused || seat < 0 || seat >= playerCount || isBot[seat]) {
             return;
@@ -406,7 +406,7 @@ public final class GameRoom {
         endPause();
     }
 
-    /** Un humain attablé écrit dans le tchat de table. Diffusé à tous, jamais persisté. */
+    /** A seated human writes in the table chat. Broadcast to everyone, never persisted. */
     public synchronized void chat(int seat, String rawText) {
         if (seat < 0 || seat >= playerCount) {
             return;
@@ -433,9 +433,9 @@ public final class GameRoom {
     }
 
     /**
-     * Éligibilité pure d'un vote de pause, sans état de room : autorisé seulement à une frontière
-     * entre manches (jamais en plein pli), si aucun autre vote/pause n'est en cours et qu'au moins
-     * un humain est attablé. {@code matchActive} = partie démarrée et non terminée ;
+     * Pure eligibility of a pause vote, without room state: allowed only at a between-rounds
+     * boundary (never mid-trick), if no other vote/pause is in progress and at least one human is
+     * seated. {@code matchActive} = game started and not finished;
      * {@code betweenRounds} = {@code match.round() == null}.
      */
     static boolean pauseAllowed(
@@ -449,15 +449,15 @@ public final class GameRoom {
         return !stopped && !stopVoteOpen && !pauseVoteOpen && !paused && matchActive && betweenRounds && humans > 0;
     }
 
-    /** Ligne de chat ELO : {@code "Alice : 1200 → 1215 (+15)"} (signe explicite, +0 pour un nul). */
+    /** ELO chat line: {@code "Alice : 1200 → 1215 (+15)"} (explicit sign, +0 for a draw). */
     static String eloChatLine(String name, int before, int after, int delta) {
         String sign = delta >= 0 ? "+" : "";
         return name + " : " + before + " → " + after + " (" + sign + delta + ")";
     }
 
     /**
-     * Index du siège déconnecté que ce revenant peut reprendre, ou -1. Le token (capacité d'invité)
-     * prime sur le userId. {@code occupied[s]} = une session est déjà active sur le siège.
+     * Index of the disconnected seat this returning player can reclaim, or -1. The token (guest
+     * capability) takes precedence over the userId. {@code occupied[s]} = a session is already active on the seat.
      */
     static int reclaimableSeat(Long userId, String token, Long[] userIds, String[] tokens, boolean[] occupied) {
         if (token != null) {
@@ -478,8 +478,8 @@ public final class GameRoom {
     }
 
     /**
-     * Décide d'un message de tchat sans aucun effet de bord : renvoie le {@link ChatBroadcast}
-     * à diffuser, ou vide si le message est ignoré (siège bot, texte vide, ou anti-spam).
+     * Decides a chat message without any side effect: returns the {@link ChatBroadcast} to
+     * broadcast, or empty if the message is ignored (bot seat, empty text, or anti-spam).
      */
     static Optional<ChatBroadcast> prepareChat(
             int seat, String name, boolean isBot, String rawText, long now, long lastChatAt, ChatFilter filter) {
@@ -517,8 +517,8 @@ public final class GameRoom {
     }
 
     /**
-     * Un revenant reprend son siège : rebind la session, lève le bot, diffuse. Renvoie le siège
-     * repris, ou -1 si aucun siège déconnecté ne lui appartient.
+     * A returning player reclaims their seat: rebinds the session, lifts the bot, broadcasts. Returns
+     * the reclaimed seat, or -1 if no disconnected seat belongs to them.
      */
     public synchronized int reclaim(WebSocketSession session, Long userId, String token) {
         boolean[] occupied = new boolean[playerCount];
@@ -539,7 +539,7 @@ public final class GameRoom {
         return seat;
     }
 
-    /** Purge les entrées d'index de tous les sièges (appelé à la destruction de la room). */
+    /** Purges the index entries of all seats (called on room destruction). */
     public synchronized void clearReconnectEntries(ReconnectIndex index) {
         if (index == null) {
             return;
@@ -750,7 +750,7 @@ public final class GameRoom {
         }
     }
 
-    /** Tous les sièges humains ont-ils déposé un vote dans le tableau fourni ? */
+    /** Have all human seats cast a vote in the given array? */
     private boolean allHumansVoted(Boolean[] ballots) {
         for (int seat = 0; seat < playerCount; seat++) {
             if (!isBot[seat] && ballots[seat] == null) {
@@ -760,7 +760,7 @@ public final class GameRoom {
         return true;
     }
 
-    /** Nombre de "oui" (true) déposés par des humains dans le tableau fourni. */
+    /** Number of "yes" (true) votes cast by humans in the given array. */
     private int yesVotes(Boolean[] ballots) {
         int yes = 0;
         for (int seat = 0; seat < playerCount; seat++) {
@@ -846,7 +846,7 @@ public final class GameRoom {
         resume();
     }
 
-    /** Ligne de chat système (deco/reco/bot/ELO/pause) : attribuée à un siège, rendue à part côté client. */
+    /** System chat line (deco/reco/bot/ELO/pause): attributed to a seat, rendered separately on the client. */
     private void broadcastSystemChat(int seat, String text) {
         broadcastRaw(Map.of(
                 "type",
@@ -970,7 +970,7 @@ public final class GameRoom {
         onStateChanged.run();
     }
 
-    /** Envoie le même payload à toutes les sessions ouvertes (pas de rédaction par siège). */
+    /** Sends the same payload to all open sessions (no per-seat redaction). */
     private synchronized void broadcastRaw(Map<String, Object> payload) {
         for (int seat = 0; seat < playerCount; seat++) {
             WebSocketSession session = sessions[seat];
@@ -1008,15 +1008,15 @@ public final class GameRoom {
             try {
                 broadcastRankedResult(ratingService.applyRankedResult(eloSeats()));
             } catch (Exception e) {
-                // l'ELO est best-effort : un échec ne doit pas interrompre la fin de partie
+                // ELO is best-effort: a failure must not interrupt the end of the game
                 LOG.warn("ranked ELO update failed for room {} (best-effort, game unaffected)", id, e);
             }
         }
     }
 
     /**
-     * Place chaque siège non abandonné selon l'ordre de classement (score), puis range tous les
-     * abandonnés à la même dernière place ex æquo — « un partant a forcément perdu ».
+     * Places each non-abandoned seat by standings order (score), then puts all abandoned seats at
+     * the same last place tied — "a leaver has necessarily lost".
      */
     static int[] placementsForElo(List<Integer> standingsOrder, boolean[] abandonedForElo) {
         int[] placement = new int[abandonedForElo.length];
@@ -1034,7 +1034,7 @@ public final class GameRoom {
         return placement;
     }
 
-    /** Un compte humain exclu (strikes) ou déconnecté est traité comme un partant pour l'ELO. */
+    /** A human account excluded (strikes) or disconnected is treated as a leaver for ELO. */
     private boolean[] abandonedForElo() {
         boolean[] flags = new boolean[playerCount];
         for (int seat = 0; seat < playerCount; seat++) {
@@ -1055,8 +1055,8 @@ public final class GameRoom {
     }
 
     /**
-     * Partie ranked annulée parce que plus aucun humain n'est connecté : avant de fermer la room,
-     * on applique le malus ELO (partants forcés en dernier). Best-effort, idempotent via {@code recorded}.
+     * Ranked game cancelled because no human is connected anymore: before closing the room, we
+     * apply the ELO penalty (leavers forced to last). Best-effort, idempotent via {@code recorded}.
      */
     public synchronized void recordAbandonmentForfeit() {
         cancelTurnTimer();
@@ -1067,7 +1067,7 @@ public final class GameRoom {
         try {
             broadcastRankedResult(ratingService.applyRankedResult(eloSeats()));
         } catch (Exception e) {
-            // best-effort : l'échec d'enregistrement ne doit pas bloquer la fermeture de la room
+            // best-effort: a recording failure must not block the room from closing
             LOG.warn("forfeit ELO update failed for room {} (best-effort, room still closes)", id, e);
         }
     }

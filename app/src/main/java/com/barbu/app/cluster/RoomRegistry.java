@@ -2,18 +2,18 @@ package com.barbu.app.cluster;
 
 import java.util.Optional;
 
-/** Propriété exclusive et durable d'une table par un pod, via lease à TTL. */
+/** Exclusive, durable ownership of a table by a pod, via a TTL lease. */
 public interface RoomRegistry {
 
-    /** Devient (ou reste) propriétaire de {@code roomId} pour {@code ttlMs}. */
+    /** Becomes (or stays) owner of {@code roomId} for {@code ttlMs}. */
     boolean tryClaim(String roomId, String podId, long ttlMs);
 
-    /** Prolonge notre lease ; faux si on ne possède plus la table. */
+    /** Extends our lease; false if we no longer own the table. */
     boolean renew(String roomId, String podId, long ttlMs);
 
-    /** Relâche la propriété, seulement si on la détient encore. */
+    /** Releases ownership, only if we still hold it. */
     void release(String roomId, String podId);
 
-    /** Pod propriétaire courant, s'il existe. */
+    /** Current owning pod, if any. */
     Optional<String> ownerOf(String roomId);
 }

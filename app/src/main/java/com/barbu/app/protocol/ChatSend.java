@@ -3,11 +3,11 @@ package com.barbu.app.protocol;
 import io.micronaut.openapi.annotation.OpenAPIExtraSchema;
 
 /**
- * Message de tchat entrant : ce que le client envoie ({@code {type:"chat", text:"..."}}).
+ * Incoming chat message: what the client sends ({@code {type:"chat", text:"..."}}).
  *
- * <p>Annoté {@link OpenAPIExtraSchema} pour entrer dans components/schemas du spec
- * (Micronaut OpenAPI n'inspecte que les @Controller), et alimenter ainsi Orval →
- * {@code @barbu-game/barbu-api}. Source unique de vérité du contrat.
+ * <p>Annotated {@link OpenAPIExtraSchema} to enter the spec's components/schemas
+ * (Micronaut OpenAPI only inspects @Controller), and thereby feed Orval →
+ * {@code @barbu-game/barbu-api}. Single source of truth for the contract.
  */
 @OpenAPIExtraSchema
 public record ChatSend(String text) {}

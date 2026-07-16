@@ -6,7 +6,7 @@ import org.junit.jupiter.api.Test;
 
 class PauseVoteTest {
 
-    // matchActive = partie en cours non terminée ; betweenRounds = match.round() == null.
+    // matchActive = game in progress, not finished; betweenRounds = match.round() == null.
     private static boolean eligibleAtBoundary() {
         return GameRoom.pauseAllowed(false, false, false, false, true, true, 2);
     }
@@ -18,7 +18,7 @@ class PauseVoteTest {
 
     @Test
     void pause_is_refused_mid_round() {
-        // betweenRounds == false : un pli est en cours.
+        // betweenRounds == false: a trick is in progress.
         assertFalse(GameRoom.pauseAllowed(false, false, false, false, true, false, 2));
     }
 
@@ -29,15 +29,15 @@ class PauseVoteTest {
 
     @Test
     void pause_is_refused_when_already_pausing_or_paused() {
-        assertFalse(GameRoom.pauseAllowed(false, false, true, false, true, true, 2)); // vote de pause déjà ouvert
-        assertFalse(GameRoom.pauseAllowed(false, false, false, true, true, true, 2)); // déjà en pause
+        assertFalse(GameRoom.pauseAllowed(false, false, true, false, true, true, 2)); // pause vote already open
+        assertFalse(GameRoom.pauseAllowed(false, false, false, true, true, true, 2)); // already paused
     }
 
     @Test
     void pause_is_refused_when_game_over_or_no_humans() {
-        assertFalse(GameRoom.pauseAllowed(true, false, false, false, true, true, 2)); // partie arrêtée
-        assertFalse(GameRoom.pauseAllowed(false, false, false, false, false, true, 2)); // match inactif/terminé
-        assertFalse(GameRoom.pauseAllowed(false, false, false, false, true, true, 0)); // aucun humain
+        assertFalse(GameRoom.pauseAllowed(true, false, false, false, true, true, 2)); // game stopped
+        assertFalse(GameRoom.pauseAllowed(false, false, false, false, false, true, 2)); // match inactive/finished
+        assertFalse(GameRoom.pauseAllowed(false, false, false, false, true, true, 0)); // no human
     }
 
     @Test

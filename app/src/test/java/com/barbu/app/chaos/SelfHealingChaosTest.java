@@ -16,9 +16,9 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import reactor.core.publisher.Flux;
 
 /**
- * Prouve le self-healing : une partie en cours survit à la perte du pod propriétaire. Deux instances
- * Micronaut (deux « pods ») partagent un Redis ; on tue le propriétaire, un client se reconnecte via
- * l'autre et retrouve exactement l'état de la table.
+ * Proves self-healing: an in-progress game survives the loss of the owning pod. Two Micronaut
+ * instances (two "pods") share a Redis; we kill the owner, a client reconnects via the other and
+ * recovers exactly the table's state.
  */
 @Testcontainers
 class SelfHealingChaosTest {

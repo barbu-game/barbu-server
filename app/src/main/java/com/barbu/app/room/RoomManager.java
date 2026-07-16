@@ -99,7 +99,7 @@ public class RoomManager {
         return room;
     }
 
-    /** Écrit le snapshot durable et prolonge notre lease : appelé à chaque changement d'état de la table. */
+    /** Writes the durable snapshot and extends our lease: called on every state change of the table. */
     public void persist(GameRoom room) {
         snapshots.save(room.id(), codec.encode(room.snapshot()));
         registry.renew(room.id(), podId, LEASE_TTL_MS);
@@ -111,7 +111,7 @@ public class RoomManager {
         }
     }
 
-    /** Relâche immédiatement tous les leases possédés (drain) : un survivant peut réclamer sans attendre le TTL. */
+    /** Immediately releases all owned leases (drain): a survivor can reclaim without waiting for the TTL. */
     public void releaseAllLeases() {
         for (String id : rooms.keySet()) {
             registry.release(id, podId);
@@ -147,9 +147,9 @@ public class RoomManager {
     public record Resolved(Resolution resolution, GameRoom room, String ownerPod) {}
 
     /**
-     * Résout où vit une table. Possédée localement → LOCAL. Sinon possédée par un autre pod vivant →
-     * REDIRECT vers lui. Sinon, si un snapshot durable existe → on la réclame et on la réhydrate
-     * localement (self-healing sur perte de pod). Sinon → NONE.
+     * Resolves where a table lives. Owned locally → LOCAL. Otherwise owned by another live pod →
+     * REDIRECT to it. Otherwise, if a durable snapshot exists → we claim it and rehydrate it
+     * locally (self-healing on pod loss). Otherwise → NONE.
      */
     public Resolved resolveOrRehydrate(String roomId) {
         GameRoom local = rooms.get(roomId);

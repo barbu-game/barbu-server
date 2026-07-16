@@ -53,10 +53,10 @@ class InMemoryMatchmakingQueueTest {
         InMemoryMatchmakingQueue q = queue();
         q.add(casual("a", 4, 100), 5_000);
         now.addAndGet(4_000);
-        q.renew("a", 5_000); // repousse l'expiration à now+5000
-        now.addAndGet(4_000); // 4s après le renew → encore vivant
+        q.renew("a", 5_000); // pushes expiry to now+5000
+        now.addAndGet(4_000); // 4s after the renew → still alive
         assertEquals(1, q.casual(4).size());
-        now.addAndGet(2_000); // 6s après le renew → expiré
+        now.addAndGet(2_000); // 6s after the renew → expired
         assertTrue(q.casual(4).isEmpty());
     }
 

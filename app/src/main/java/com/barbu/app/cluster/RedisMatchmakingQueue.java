@@ -9,7 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-/** File de matchmaking partagée (active dès que {@code redis.uri} est fourni). */
+/** Shared matchmaking queue (active as soon as {@code redis.uri} is provided). */
 @Singleton
 @Requires(property = "redis.uri")
 public class RedisMatchmakingQueue implements MatchmakingQueue {
@@ -49,8 +49,8 @@ public class RedisMatchmakingQueue implements MatchmakingQueue {
 
     @Override
     public void add(Entry e, long ttlMs) {
-        // L'entrée JSON porte un TTL ; le membre du ZSET (juste l'id) est nettoyé paresseusement à la
-        // lecture si sa clé d'entrée a expiré. Le score = enqueuedAt donne l'ordre FIFO/ancienneté.
+        // The JSON entry carries a TTL; the ZSET member (just the id) is cleaned up lazily on read if
+        // its entry key has expired. The score = enqueuedAt gives FIFO/seniority ordering.
         redis.psetex(ENTRY + e.entryId(), ttlMs, toJson(e));
         redis.zadd(zsetKeyFor(e), (double) e.enqueuedAt(), e.entryId());
     }
@@ -85,7 +85,7 @@ public class RedisMatchmakingQueue implements MatchmakingQueue {
         for (String id : ids) {
             String json = redis.get(ENTRY + id);
             if (json == null) {
-                redis.zrem(zsetKey, id); // entrée expirée → nettoyage paresseux du membre
+                redis.zrem(zsetKey, id); // expired entry → lazy cleanup of the member
             } else {
                 out.add(fromJson(json, Entry.class));
             }

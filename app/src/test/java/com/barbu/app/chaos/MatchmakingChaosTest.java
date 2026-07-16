@@ -15,9 +15,9 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import reactor.core.publisher.Flux;
 
 /**
- * Prouve les deux gains vs docker-compose : (1) défragmentation — deux joueurs sur des pods
- * DIFFÉRENTS forment UNE table via la file Redis partagée ; (2) durabilité — la file survit à la
- * mort d'un pod, un joueur qui revient re-enfile et matche via le pod survivant.
+ * Proves the two gains vs docker-compose: (1) defragmentation — two players on DIFFERENT pods
+ * form ONE table via the shared Redis queue; (2) durability — the queue survives a pod death, a
+ * returning player re-enqueues and matches via the surviving pod.
  */
 @Testcontainers
 class MatchmakingChaosTest {
@@ -37,8 +37,8 @@ class MatchmakingChaosTest {
     }
 
     private EmbeddedServer instance(String podId) {
-        // TTL d'entrée court : après la mort d'un pod, l'entrée orpheline de son joueur en file
-        // expire vite, pour que le test de durabilité soit déterministe (pas de match « volé »).
+        // Short entry TTL: after a pod dies, its player's orphaned queue entry expires quickly,
+        // so the durability test is deterministic (no "stolen" match).
         return ApplicationContext.run(
                 EmbeddedServer.class,
                 Map.of(
@@ -78,9 +78,9 @@ class MatchmakingChaosTest {
                     mb.path("roomId").asText(),
                     "players enqueued on different pods land in the SAME room (queue is global)");
 
-            // Alice réclame son siège réservé. Si la table vit sur l'AUTRE pod, `matched` porte `pod` et
-            // elle s'y rebranche ; si elle vit sur son propre pod (leader = pod-A), `pod` est omis et elle
-            // réclame sur sa connexion courante — exactement le contrat que suit le client navigateur.
+            // Alice reclaims her reserved seat. If the table lives on the OTHER pod, `matched` carries
+            // `pod` and she reconnects there; if it lives on her own pod (leader = pod-A), `pod` is omitted
+            // and she reclaims on her current connection — exactly the contract the browser client follows.
             TestGameClient reclaimer;
             boolean reclaimerIsNew;
             if (ma.has("pod")) {
@@ -113,18 +113,18 @@ class MatchmakingChaosTest {
         EmbeddedServer a = instance("pod-A");
         EmbeddedServer b = instance("pod-B");
         try {
-            // Alice enfile sur A (seule, taille 2 → en attente), puis A meurt.
+            // Alice enqueues on A (alone, size 2 → waiting), then A dies.
             TestGameClient aliceOnA = connect(a);
             aliceOnA.sendJson(Map.of("type", "enqueueMatchmaking", "name", "Alice", "size", 2));
-            Thread.sleep(1_200); // laisse un tick s'écouler : l'entrée est dans Redis
+            Thread.sleep(1_200); // let a tick elapse: the entry is in Redis
             aliceOnA.close();
             a.stop();
 
-            // Laisse l'entrée orpheline d'Alice (homePod pod-A, mort) expirer via son TTL (3s) avant de
-            // re-enfiler : sinon le leader pourrait l'apparier et « voler » le match du joueur revenu.
+            // Let Alice's orphaned entry (homePod pod-A, dead) expire via its TTL (3s) before
+            // re-enqueuing: otherwise the leader could pair it and "steal" the returning player's match.
             Thread.sleep(3_500);
 
-            // Alice revient via le survivant B et re-enfile ; Bob enfile aussi sur B.
+            // Alice returns via the survivor B and re-enqueues; Bob enqueues on B too.
             TestGameClient aliceOnB = connect(b);
             aliceOnB.sendJson(Map.of("type", "enqueueMatchmaking", "name", "Alice", "size", 2));
             TestGameClient bobOnB = connect(b);

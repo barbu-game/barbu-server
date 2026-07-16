@@ -18,9 +18,9 @@ class EloCalculatorTest {
 
     @Test
     void two_equal_players_winner_gains_half_k_loser_loses_it() {
-        // K=32, ratings égaux → expected 0.5 ; gagnant placement 1, perdant 2.
+        // K=32, equal ratings → expected 0.5; winner placement 1, loser 2.
         List<Integer> d = deltas(List.of(
-                new Participant(1000, 50, 1), // gamesPlayed 50 → non provisoire (K=32)
+                new Participant(1000, 50, 1), // gamesPlayed 50 → non-provisional (K=32)
                 new Participant(1000, 50, 2)));
         assertEquals(16, d.get(0));
         assertEquals(-16, d.get(1));
@@ -66,8 +66,8 @@ class EloCalculatorTest {
 
     @Test
     void sum_of_deltas_is_near_zero_for_equal_k() {
-        // À K égal (tous non provisoires), la somme non arrondie vaut 0 ; l'arrondi entier
-        // borne l'erreur à ~N/2. On vérifie la propriété de somme nulle sur des configs aléatoires.
+        // At equal K (all non-provisional), the unrounded sum is 0; integer rounding bounds the
+        // error to ~N/2. We check the zero-sum property over random configurations.
         Random rng = new Random(42);
         for (int trial = 0; trial < 200; trial++) {
             int n = 2 + rng.nextInt(9); // 2..10

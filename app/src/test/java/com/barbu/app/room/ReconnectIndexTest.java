@@ -27,9 +27,9 @@ class ReconnectIndexTest {
     void forget_is_conditional_on_the_room_id() {
         ReconnectIndex index = new InMemoryReconnectIndex();
         index.register(7L, "tok-a", "ROOM1");
-        // Le joueur rejoint une autre room : son entrée pointe désormais sur ROOM2.
+        // The player joins another room: their entry now points to ROOM2.
         index.register(7L, "tok-b", "ROOM2");
-        // ROOM1 est GC'd et tente d'oublier l'ancienne entrée — ne doit PAS toucher ROOM2.
+        // ROOM1 is GC'd and tries to forget the old entry — must NOT touch ROOM2.
         index.forget(7L, "tok-a", "ROOM1");
         assertEquals("ROOM2", index.roomForUser(7L));
         assertNull(index.roomForToken("tok-a"));

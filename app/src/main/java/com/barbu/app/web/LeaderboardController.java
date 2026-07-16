@@ -9,7 +9,7 @@ import io.micronaut.security.annotation.Secured;
 import io.micronaut.security.rules.SecurityRule;
 import java.util.List;
 
-/** Classement public par rating ELO décroissant. */
+/** Public leaderboard by descending ELO rating. */
 @Controller("/leaderboard")
 @Secured(SecurityRule.IS_ANONYMOUS)
 public class LeaderboardController {

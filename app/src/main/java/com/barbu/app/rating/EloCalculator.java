@@ -4,9 +4,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Calcul ELO multi-joueurs par décomposition en paires : le classement final est traité
- * comme l'ensemble des duels deux à deux, chaque delta étant moyenné sur les N-1 adversaires.
- * Se réduit à l'ELO 1v1 standard à N=2. Pur : ne connaît ni la base, ni les rooms.
+ * Multi-player ELO computed by pairwise decomposition: the final ranking is treated as the set of
+ * all head-to-head duels, each delta being averaged over the N-1 opponents. Reduces to standard 1v1
+ * ELO at N=2. Pure: knows nothing about the database or the rooms.
  */
 public final class EloCalculator {
 
@@ -17,14 +17,14 @@ public final class EloCalculator {
     }
 
     /**
-     * Un participant : son rating courant, son nombre de parties (pour le K provisoire), son rang
-     * final (1 = premier).
+     * A participant: current rating, number of games played (for the provisional K), and final
+     * placement (1 = first).
      */
     public record Participant(int rating, int gamesPlayed, int placement) {}
 
     public record Delta(int ratingDelta) {}
 
-    /** Renvoie un delta par participant, dans l'ordre de la liste d'entrée. */
+    /** Returns one delta per participant, in the order of the input list. */
     public List<Delta> compute(List<Participant> participants) {
         int n = participants.size();
         List<Delta> out = new ArrayList<>(n);

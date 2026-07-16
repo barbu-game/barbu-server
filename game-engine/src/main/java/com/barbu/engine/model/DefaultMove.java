@@ -5,9 +5,9 @@ import com.barbu.engine.card.Suit;
 import java.util.List;
 
 /**
- * Coup « par défaut » déterministe joué quand un siège n'agit pas à temps : la carte légale la
- * plus faible (départage par couleur stable, noir avant rouge), ou « passe » s'il n'y a aucune
- * carte jouable (cas montante où l'on ne peut rien poser).
+ * Deterministic "default" move played when a seat does not act in time: the lowest legal card
+ * (tie-broken by a stable suit order, black before red), or "pass" if there is no playable card
+ * (the montante case where nothing can be laid down).
  */
 public final class DefaultMove {
 

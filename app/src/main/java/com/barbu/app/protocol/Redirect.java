@@ -3,8 +3,8 @@ package com.barbu.app.protocol;
 import io.micronaut.openapi.annotation.OpenAPIExtraSchema;
 
 /**
- * Indique au client de se reconnecter au pod propriétaire de la table (routage par roomId) :
- * {@code {type:"redirect", roomId, pod}}. Annoté {@link OpenAPIExtraSchema} pour entrer dans le contrat.
+ * Tells the client to reconnect to the pod owning the table (routing by roomId):
+ * {@code {type:"redirect", roomId, pod}}. Annotated {@link OpenAPIExtraSchema} to enter the contract.
  */
 @OpenAPIExtraSchema
 public record Redirect(String type, String roomId, String pod) {

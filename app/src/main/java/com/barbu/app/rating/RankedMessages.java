@@ -4,8 +4,8 @@ import io.micronaut.openapi.annotation.OpenAPIExtraSchema;
 import java.util.List;
 
 /**
- * DTO du message WebSocket de fin de partie ranked (delta ELO par siège). Annotés
- * {@link OpenAPIExtraSchema} pour entrer dans le spec sans controller factice, comme le tchat.
+ * DTO for the ranked end-of-game WebSocket message (ELO delta per seat). Annotated
+ * {@link OpenAPIExtraSchema} to enter the spec without a dummy controller, like the chat.
  */
 public final class RankedMessages {
 

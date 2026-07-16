@@ -10,7 +10,7 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Flux;
 
-/** Sur un seul pod : deux joueurs casual (taille 2) forment UNE table et reçoivent matched→joined. */
+/** On a single pod: two casual players (size 2) form ONE table and receive matched→joined. */
 class MatchmakingIntegrationTest {
 
     private TestGameClient connect(EmbeddedServer server) {
@@ -20,7 +20,7 @@ class MatchmakingIntegrationTest {
 
     @Test
     void two_casual_players_of_the_same_size_form_one_table() throws Exception {
-        // bot-delay élevé pour garder la table stable après le start
+        // high bot-delay to keep the table stable after start
         EmbeddedServer server = ApplicationContext.run(
                 EmbeddedServer.class, Map.of("POD_ID", "local", "barbu.bot-delay-ms", 3_600_000));
         try {
@@ -35,9 +35,9 @@ class MatchmakingIntegrationTest {
                     matchedA.path("roomId").asText(),
                     matchedB.path("roomId").asText(),
                     "both are matched into the same room");
-            // Table réservée sur ce même pod : pas de champ `pod`, donc pas de redirection /pod/<pod>
-            // (le préfixe n'existe que derrière Traefik en multi-pod). Le client réclame son siège en
-            // place — c'est ce qui casse le matchmaking navigateur en mono-instance quand `pod` est émis.
+            // Table reserved on this same pod: no `pod` field, so no /pod/<pod> redirect (the prefix
+            // only exists behind Traefik in multi-pod). The client reclaims its seat in place — this is
+            // what breaks browser matchmaking on a single instance when `pod` is emitted.
             assertFalse(matchedA.has("pod"), "same-pod match must not ask the client to switch pods");
 
             a.sendJson(Map.of(

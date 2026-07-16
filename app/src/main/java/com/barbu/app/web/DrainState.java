@@ -2,7 +2,7 @@ package com.barbu.app.web;
 
 import jakarta.inject.Singleton;
 
-/** Bascule d'arrêt gracieux : une fois en drain, la readiness échoue et les leases sont relâchés. */
+/** Graceful shutdown switch: once draining, readiness fails and the leases are released. */
 @Singleton
 public class DrainState {
 
