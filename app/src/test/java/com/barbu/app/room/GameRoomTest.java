@@ -144,10 +144,10 @@ class GameRoomTest {
         ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
         try {
             GameRoom room = new GameRoom("HOSTB", 5, Variants.DEVELOPER, new ObjectMapper(), scheduler, 0, null, null);
-            room.addHuman(new FakeSession(), "Alice", null); // seat 0
-            room.addHuman(new FakeSession(), "Bob", null); // seat 1
-            assertTrue(room.addBot()); // seat 2
-            assertTrue(room.addBot()); // seat 3
+            room.addHuman(new FakeSession(), "Alice", null);
+            room.addHuman(new FakeSession(), "Bob", null);
+            assertTrue(room.addBot());
+            assertTrue(room.addBot());
             assertEquals("Bot 1", room.viewFor(0).players().get(2).name());
             assertEquals("Bot 2", room.viewFor(0).players().get(3).name());
         } finally {
@@ -161,9 +161,9 @@ class GameRoomTest {
         try {
             GameRoom room = new GameRoom("HOSTH", 4, Variants.DEVELOPER, new ObjectMapper(), scheduler, 0, null, null);
             assertEquals(-1, room.hostSeat());
-            room.addHuman(new FakeSession(), "Alice", null); // seat 0
-            room.addHuman(new FakeSession(), "Bob", null); // seat 1
-            room.addBot(); // seat 2
+            room.addHuman(new FakeSession(), "Alice", null);
+            room.addHuman(new FakeSession(), "Bob", null);
+            room.addBot();
             assertEquals(0, room.hostSeat());
             assertTrue(room.isHost(0));
             assertFalse(room.isHost(1));
@@ -178,8 +178,8 @@ class GameRoomTest {
         ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
         try {
             GameRoom room = new GameRoom("RENB", 3, Variants.DEVELOPER, new ObjectMapper(), scheduler, 0, null, null);
-            room.addHuman(new FakeSession(), "Alice", null); // seat 0
-            room.addBot(); // seat 1, "Bot 1"
+            room.addHuman(new FakeSession(), "Alice", null);
+            room.addBot();
             assertTrue(room.renameBot(1, "  Rex  "));
             assertEquals("Rex", room.viewFor(0).players().get(1).name());
             assertTrue(room.renameBot(1, "z".repeat(60)));
@@ -194,8 +194,8 @@ class GameRoomTest {
         ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
         try {
             GameRoom room = new GameRoom("RENX", 3, Variants.DEVELOPER, new ObjectMapper(), scheduler, 0, null, null);
-            room.addHuman(new FakeSession(), "Alice", null); // seat 0 (human)
-            room.addBot(); // seat 1
+            room.addHuman(new FakeSession(), "Alice", null);
+            room.addBot();
             assertFalse(room.renameBot(0, "Nope")); // not a bot
             assertFalse(room.renameBot(1, "   ")); // blank
             assertEquals("Bot 1", room.viewFor(0).players().get(1).name());
@@ -209,12 +209,12 @@ class GameRoomTest {
         ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
         try {
             GameRoom room = new GameRoom("LEAVE", 4, Variants.DEVELOPER, new ObjectMapper(), scheduler, 0, null, null);
-            room.addHuman(new FakeSession(), "Alice", null); // seat 0 (host)
-            room.addHuman(new FakeSession(), "Bob", null); // seat 1
-            room.addBot(); // seat 2
+            room.addHuman(new FakeSession(), "Alice", null);
+            room.addHuman(new FakeSession(), "Bob", null);
+            room.addBot();
             assertEquals(0, room.hostSeat());
             assertTrue(room.leave(0));
-            assertEquals(1, room.hostSeat()); // migrated
+            assertEquals(1, room.hostSeat());
             assertFalse(room.isEmptyOfHumans());
             assertTrue(room.leave(1));
             assertTrue(room.isEmptyOfHumans());
@@ -228,7 +228,7 @@ class GameRoomTest {
         ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
         try {
             GameRoom room = new GameRoom("LEAV2", 3, Variants.DEVELOPER, new ObjectMapper(), scheduler, 0, null, null);
-            room.addHuman(new FakeSession(), "Alice", null); // seat 0
+            room.addHuman(new FakeSession(), "Alice", null);
             assertFalse(room.leave(1)); // nobody there
         } finally {
             scheduler.shutdownNow();
@@ -240,7 +240,7 @@ class GameRoomTest {
         ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
         try {
             GameRoom room = new GameRoom("RSV", 3, Variants.DEVELOPER, new ObjectMapper(), scheduler, 0, null, null);
-            int seatA = room.addHuman(new FakeSession(), "Alice", 1L); // seat 0
+            int seatA = room.addHuman(new FakeSession(), "Alice", 1L);
             assertEquals(0, seatA);
             room.handleDisconnect(seatA); // Alice backgrounds: seat 0 stays reserved
             int seatB = room.addHuman(new FakeSession(), "Bob", 2L); // must skip the reserved seat 0

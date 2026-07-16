@@ -21,7 +21,7 @@ public final class Variants {
     private static final TrickScoringRule HEARTS = new CardPenalty(Card::isHeart, ScoringConfig.PER_HEART, "heart");
     private static final TrickScoringRule QUEENS = new CardPenalty(Card::isQueen, ScoringConfig.PER_QUEEN, "queen");
 
-    // The five-contract table normalises every contract to the same per-round total (spec §2.4).
+    // The five-contract table normalises every contract to the same per-round total.
     private static final TrickScoringRule TRICKS_60 = new NormalizedTrickPenalty();
     private static final TrickScoringRule HEARTS_60 = new NormalizedCardPenalty(Card::isHeart, "heart");
     private static final TrickScoringRule QUEENS_60 = new NormalizedCardPenalty(Card::isQueen, "queen");

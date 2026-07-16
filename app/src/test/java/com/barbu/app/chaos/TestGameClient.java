@@ -9,7 +9,7 @@ import io.micronaut.websocket.annotation.OnOpen;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Predicate;
 
-/** Client WebSocket headless : envoie des commandes JSON et collecte les messages reçus. */
+/** Headless WebSocket client: sends JSON commands and collects received messages. */
 @ClientWebSocket("/ws/game")
 public class TestGameClient implements AutoCloseable {
 
@@ -36,7 +36,7 @@ public class TestGameClient implements AutoCloseable {
         }
     }
 
-    /** Attend (≤10s) un message satisfaisant le prédicat et le renvoie. */
+    /** Waits (≤10s) for a message satisfying the predicate and returns it. */
     JsonNode await(Predicate<JsonNode> match) throws InterruptedException {
         for (int i = 0; i < 200; i++) {
             for (JsonNode m : messages) {

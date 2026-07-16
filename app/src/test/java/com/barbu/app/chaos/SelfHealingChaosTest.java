@@ -16,9 +16,9 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import reactor.core.publisher.Flux;
 
 /**
- * Prouve le self-healing : une partie en cours survit à la perte du pod propriétaire. Deux instances
- * Micronaut (deux « pods ») partagent un Redis ; on tue le propriétaire, un client se reconnecte via
- * l'autre et retrouve exactement l'état de la table.
+ * Proves self-healing: an in-progress game survives the loss of the owning pod. Two Micronaut
+ * instances (two "pods") share a Redis; we kill the owner, a client reconnects via the other and
+ * recovers exactly the table's state.
  */
 @Testcontainers
 class SelfHealingChaosTest {
@@ -92,7 +92,7 @@ class SelfHealingChaosTest {
     void a_fresh_instance_rehydrates_the_table_via_redis() throws Exception {
         // Contrast (the "Compose would lose it" scenario, but proving the shared-state win): even after
         // the ONLY instance is replaced, a new instance rehydrates the table from Redis. Under Compose
-        // (single host, no shared state) the same restart loses the game — documented in load/README.md.
+        // (single host, no shared state) the same restart loses the game.
         EmbeddedServer first = instance("pod-solo");
         TestGameClient client = connect(first);
         client.sendJson(Map.of("type", "createRoom", "name", "Bob", "playerCount", 4));

@@ -1,8 +1,8 @@
 package com.barbu.engine.model;
 
 /**
- * Centralized, tunable scoring (spec §2.4). Changing the game balance means editing
- * this class only — never the rules logic.
+ * Centralized, tunable scoring. Changing the game balance means editing this class
+ * only — never the rules logic.
  */
 public final class ScoringConfig {
     private ScoringConfig() {}

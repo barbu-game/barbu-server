@@ -9,9 +9,9 @@ class EloPlacementsTest {
 
     @Test
     void abandoned_seats_are_ranked_below_everyone_who_stayed() {
-        // Ordre par score décroissant : seat2, seat0, seat1, seat3 ; seat1 a abandonné.
+        // Order by descending score: seat2, seat0, seat1, seat3; seat1 abandoned.
         int[] placements = GameRoom.placementsForElo(List.of(2, 0, 1, 3), new boolean[] {false, true, false, false});
-        // seat0->2, seat1->dernier(4), seat2->1, seat3->3
+        // seat0->2, seat1->last(4), seat2->1, seat3->3
         assertArrayEquals(new int[] {2, 4, 1, 3}, placements);
     }
 

@@ -5,15 +5,15 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Décision de matchmaking casual, pure et testable : forme une table pleine d'humains dès que
- * {@code size} joueurs attendent, sinon complète de bots une table incomplète passé le timeout.
- * Le wrapping (sessions, création de room) vit dans {@link MatchmakingCoordinator}.
+ * Casual matchmaking decision, pure and testable: forms a full table of humans as soon as
+ * {@code size} players are waiting, otherwise fills an incomplete table with bots past the timeout.
+ * The wrapping (sessions, room creation) lives in {@link MatchmakingCoordinator}.
  */
 public final class CasualMatchmaker {
 
     private CasualMatchmaker() {}
 
-    /** Un joueur en attente, anonymisé pour la décision. Les indices renvoyés référencent {@code waiting}. */
+    /** A waiting player, anonymized for the decision. The returned indices reference {@code waiting}. */
     public record Candidate(long enqueuedAt) {}
 
     public record Formation(List<Integer> indices, int botsToAdd) {}

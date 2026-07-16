@@ -13,7 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-/** Façade entre le calcul ELO pur et la persistance des ratings de compte. */
+/** Facade between the pure ELO computation and the persistence of account ratings. */
 @Singleton
 public class RatingService {
 
@@ -29,10 +29,10 @@ public class RatingService {
         this.calculator = new EloCalculator(config);
     }
 
-    /** Un siège de fin de partie : son rang (1 = premier) et l'identité du compte (null si bot/invité). */
+    /** An end-of-game seat: its placement (1 = first) and the account identity (null if bot/guest). */
     public record SeatRating(int seat, Long userId, boolean isBot, int placement) {}
 
-    /** Le mouvement de rating d'un siège humain, pour la diffusion fin de partie. */
+    /** The rating movement of a human seat, for the end-of-game broadcast. */
     public record RatingUpdate(int seat, int before, int after, int delta) {}
 
     public record LeaderboardRow(int rank, String username, int rating, int gamesPlayed) {}
@@ -46,9 +46,9 @@ public class RatingService {
     }
 
     /**
-     * Applique une partie ranked terminée : calcule les deltas (bots inclus dans le calcul avec
-     * leur rating de config), n'écrit que les sièges humains (gamesPlayed+1), et renvoie leurs
-     * mouvements. Transactionnel : tout ou rien.
+     * Applies a finished ranked game: computes the deltas (bots included in the computation with
+     * their config rating), writes only the human seats (gamesPlayed+1), and returns their
+     * movements. Transactional: all or nothing.
      */
     @Transactional
     public List<RatingUpdate> applyRankedResult(List<SeatRating> seats) {
@@ -87,7 +87,7 @@ public class RatingService {
         return out;
     }
 
-    /** Upsert portable H2/Postgres (pas de {@code ON CONFLICT}) : existence puis update ou save. */
+    /** Portable H2/Postgres upsert (no {@code ON CONFLICT}): existence check then update or save. */
     private void upsert(long userId, int rating, int gamesPlayed, Instant now) {
         PlayerRatingEntity entity = new PlayerRatingEntity(userId, rating, gamesPlayed, now);
         if (ratings.existsById(userId)) {

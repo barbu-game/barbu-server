@@ -7,16 +7,13 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Snapshot d'état rédigé pour un siège, diffusé sur le WebSocket à chaque transition.
+ * State snapshot redacted for a seat, broadcast over the WebSocket on every transition.
  *
- * <p>Annoté {@link OpenAPIExtraSchema} : Micronaut OpenAPI n'inspecte que les {@code @Controller},
- * donc ce record (et ses imbriqués) n'entreraient pas dans {@code components/schemas} sans cette
- * annotation. C'est la source unique du type côté client (Orval → {@code @barbu-game/barbu-api}) :
- * tout drift de cette forme casse le typecheck web.
+ * <p>{@link OpenAPIExtraSchema} enters it (and its nested records) into components/schemas
+ * (Micronaut OpenAPI inspects only {@code @Controller}); drives the {@code @barbu-game/barbu-api} client type.
  *
- * <p>{@code NON_NULL} : un champ absent du snapshot ne doit pas apparaître dans le JSON (le client
- * le lit comme optionnel). Les sous-records de vote dérogent volontairement et émettent
- * {@code youVoted} même nul — le client distingue « siège n'ayant pas voté / bot » d'un vote.
+ * <p>{@code NON_NULL}: fields absent from the snapshot stay out of the JSON. The vote sub-records
+ * deliberately opt out, emitting {@code youVoted} even when null, to distinguish "not voted / bot" from a vote.
  */
 @OpenAPIExtraSchema
 @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -89,7 +86,7 @@ public record GameStateMessage(
     public record BoardCell(boolean opened, int low, int high) {}
 
     /**
-     * Coup légal : {@code kind="card"} porte suit/rank, {@code kind="pass"} les omet (NON_NULL).
+     * Legal move: {@code kind="card"} carries suit/rank, {@code kind="pass"} omits them (NON_NULL).
      */
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public record MoveView(

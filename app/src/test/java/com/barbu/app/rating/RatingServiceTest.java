@@ -46,18 +46,18 @@ class RatingServiceTest {
                 new SeatRating(2, null, true, 3),
                 new SeatRating(3, null, true, 4)));
 
-        // Deux humains mis à jour, bots ignorés.
+        // Two humans updated, bots skipped.
         assertEquals(2, updates.size());
         RatingUpdate w = updates.stream().filter(u -> u.seat() == 0).findFirst().orElseThrow();
         RatingUpdate l = updates.stream().filter(u -> u.seat() == 1).findFirst().orElseThrow();
         assertEquals(1000, w.before());
-        // 1er place gagne ; il gagne plus que le 2e (face à deux bots faibles, finir 2e peut rester
-        // légèrement positif — l'important est l'ordre des mouvements, pas un signe absolu).
+        // 1st place wins; it gains more than the 2nd (against two weak bots, finishing 2nd may stay
+        // slightly positive — what matters is the order of movements, not an absolute sign).
         assertTrue(w.delta() > 0, "winner should gain");
         assertTrue(w.delta() > l.delta(), "winner should gain more than runner-up");
         assertEquals(w.before() + w.delta(), w.after());
 
-        // Persistance : ligne créée, gamesPlayed = 1.
+        // Persistence: row created, gamesPlayed = 1.
         assertEquals(w.after(), ratingRepo.findById(winner).orElseThrow().rating());
         assertEquals(1, ratingRepo.findById(winner).orElseThrow().gamesPlayed());
         assertEquals(1, ratingRepo.findById(loser).orElseThrow().gamesPlayed());
@@ -67,7 +67,7 @@ class RatingServiceTest {
     void leaderboard_is_ordered_by_rating_desc() {
         long a = newUser("lead-a-" + System.nanoTime());
         long b = newUser("lead-b-" + System.nanoTime());
-        // a bat b → a > 1000 > b
+        // a beats b → a > 1000 > b
         ratings.applyRankedResult(List.of(new SeatRating(0, a, false, 1), new SeatRating(1, b, false, 2)));
         List<RatingService.LeaderboardRow> top = ratings.topPlayers(50);
         for (int i = 1; i < top.size(); i++) {

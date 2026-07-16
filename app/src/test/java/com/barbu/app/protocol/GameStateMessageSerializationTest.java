@@ -14,9 +14,9 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 /**
- * Verrouille la forme JSON du snapshot d'état : le client lit un champ absent comme optionnel,
- * mais distingue {@code youVoted:null} (n'a pas voté / bot) d'un vote. Ces invariants ne sont pas
- * déductibles du type, d'où ces assertions.
+ * Locks the JSON shape of the state snapshot: the client reads an absent field as optional, but
+ * distinguishes {@code youVoted:null} (did not vote / bot) from a vote. These invariants are not
+ * deducible from the type, hence these assertions.
  */
 class GameStateMessageSerializationTest {
 

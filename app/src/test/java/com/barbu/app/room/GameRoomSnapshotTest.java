@@ -16,7 +16,7 @@ class GameRoomSnapshotTest {
     private final ObjectMapper mapper = new ObjectMapper();
     private final SnapshotCodec codec = new SnapshotCodec(new ObjectMapper());
 
-    // Large bot delay so no bot move races the snapshot read; reconnectIndex null to decouple from Task 4.
+    // Large bot delay so no bot move races the snapshot read; reconnectIndex null keeps reconnect wiring out of it.
     private GameRoom newRoom(String id) {
         return new GameRoom(
                 id, 4, Variants.DEVELOPER, mapper, scheduler, 3_600_000L, null, null, "casual", null, null, 60000, 2);

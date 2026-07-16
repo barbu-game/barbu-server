@@ -4,10 +4,7 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/**
- * Masque les mots interdits par un nombre fixe d'étoiles. Volontairement minimaliste
- * (liste statique) : un vrai filtre de modération dépasse le périmètre de cette feature.
- */
+/** Masks banned words. Deliberately minimalist (static list); real moderation is out of scope. */
 public final class ChatFilter {
 
     private static final String MASK = "****";

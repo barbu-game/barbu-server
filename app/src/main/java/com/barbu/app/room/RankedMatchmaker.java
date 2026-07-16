@@ -7,36 +7,36 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Décision de matchmaking ranked, pure et testable : d'abord une table 100% humaine dont l'écart de
- * rating tient dans une fenêtre commune qui s'élargit avec l'attente ; sinon un bot-fill borné aux
- * tables faible-ELO ayant assez patienté. Le wrapping (sessions, rating, création de room) vit dans
+ * Ranked matchmaking decision, pure and testable: first a 100% human table whose rating spread fits
+ * within a common window that widens with waiting time; otherwise a bot-fill bounded to low-ELO
+ * tables that have waited long enough. The wrapping (sessions, rating, room creation) lives in
  * {@link MatchmakingCoordinator}.
  */
 public final class RankedMatchmaker {
 
     private RankedMatchmaker() {}
 
-    /** Un joueur en attente, anonymisé pour la décision. Les indices renvoyés référencent {@code waiting}. */
+    /** A waiting player, anonymized for the decision. The returned indices reference {@code waiting}. */
     public record Candidate(int rating, long enqueuedAt) {}
 
-    /** Résultat : les indices (dans la liste d'attente) à asseoir, et le nombre de bots à ajouter. */
+    /** Result: the indices (in the waiting list) to seat, and the number of bots to add. */
     public record Formation(List<Integer> indices, int botsToAdd) {}
 
-    /** Fenêtre de rating acceptable pour un candidat selon son temps d'attente. */
+    /** Acceptable rating window for a candidate based on its waiting time. */
     private static int window(Candidate c, long now, EloConfig cfg) {
         long steps = Math.max(0, (now - c.enqueuedAt()) / cfg.windowStepMs());
         return cfg.initialWindow() + (int) steps * cfg.windowWidthPerStep();
     }
 
     /**
-     * Décide s'il faut former une table maintenant. D'abord une table 100% humaine dont l'écart de
-     * rating tient dans la fenêtre commune ; sinon un bot-fill si une table faible-ELO a assez attendu.
+     * Decides whether a table should be formed now. First a 100% human table whose rating spread
+     * fits within the common window; otherwise a bot-fill if a low-ELO table has waited long enough.
      */
     public static Optional<Formation> decideFormation(List<Candidate> waiting, long now, EloConfig cfg) {
         int size = cfg.rankedTableSize();
 
-        // 1) Table pleine d'humains : trier par rating, chercher un segment contigu de `size`
-        //    dont l'écart (borne haute - borne basse) <= la plus petite fenêtre du segment.
+        // 1) Full table of humans: sort by rating, look for a contiguous segment of `size`
+        //    whose spread (upper bound - lower bound) <= the smallest window in the segment.
         if (waiting.size() >= size) {
             List<Integer> byRating = new ArrayList<>();
             for (int i = 0; i < waiting.size(); i++) {
@@ -60,7 +60,7 @@ public final class RankedMatchmaker {
             }
         }
 
-        // 2) Bot-fill : table incomplète, faible-ELO, qui a dépassé le timeout d'attente.
+        // 2) Bot-fill: incomplete, low-ELO table that has exceeded the waiting timeout.
         if (!waiting.isEmpty() && waiting.size() < size) {
             long oldestWait = now
                     - waiting.stream().mapToLong(Candidate::enqueuedAt).min().getAsLong();

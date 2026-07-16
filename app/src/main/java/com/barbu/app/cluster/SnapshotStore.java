@@ -2,7 +2,7 @@ package com.barbu.app.cluster;
 
 import java.util.Optional;
 
-/** Persistance durable de l'état sérialisé d'une table, relocalisable entre pods. */
+/** Durable persistence of a table's serialized state, relocatable across pods. */
 public interface SnapshotStore {
 
     void save(String roomId, String json);

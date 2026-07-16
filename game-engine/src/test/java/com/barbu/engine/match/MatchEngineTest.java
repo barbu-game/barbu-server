@@ -52,8 +52,8 @@ class MatchEngineTest {
 
     @Test
     void montante_opens_left_of_dealer_regardless_of_eight_holder() {
-        // Donneur = 0 (newMatch), donc l'ouvreur doit toujours être le siège 1,
-        // quel que soit le détenteur du 8 de carreau sur chaque graine.
+        // Dealer = 0 (newMatch), so the opener must always be seat 1,
+        // regardless of who holds the eight of diamonds on each seed.
         for (long seed = 0; seed < 10; seed++) {
             MatchState m = MatchEngine.chooseContract(MatchEngine.newMatch(5, seed), Contract.MONTANTE);
             assertEquals(1, m.round().currentPlayer(), "seed=" + seed);

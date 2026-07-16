@@ -11,7 +11,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.LongSupplier;
 import java.util.function.Predicate;
 
-/** File de matchmaking mono-pod (par défaut, en l'absence de {@code redis.uri}). */
+/** Single-pod matchmaking queue (default, when {@code redis.uri} is absent). */
 @Singleton
 @Requires(missingProperty = "redis.uri")
 public class InMemoryMatchmakingQueue implements MatchmakingQueue {

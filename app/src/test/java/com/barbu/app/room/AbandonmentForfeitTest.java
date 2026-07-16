@@ -54,7 +54,7 @@ class AbandonmentForfeitTest {
             room.addBot();
             room.start(7L);
 
-            // L'unique humain se déconnecte : la table n'a plus aucun humain.
+            // The only human disconnects: the table no longer has any human.
             room.handleDisconnect(seat);
             assertTrue(room.isEmptyOfHumans());
             room.recordAbandonmentForfeit();

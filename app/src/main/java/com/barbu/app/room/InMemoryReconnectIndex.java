@@ -5,7 +5,7 @@ import jakarta.inject.Singleton;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-/** Index de reconnexion mono-pod (par défaut, en l'absence de {@code redis.uri}). */
+/** Single-pod reconnection index (the default, in the absence of {@code redis.uri}). */
 @Singleton
 @Requires(missingProperty = "redis.uri")
 public class InMemoryReconnectIndex implements ReconnectIndex {

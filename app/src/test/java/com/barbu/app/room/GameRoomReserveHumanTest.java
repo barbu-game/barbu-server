@@ -21,7 +21,7 @@ class GameRoomReserveHumanTest {
                 null, // recorder
                 null, // metrics
                 "casual",
-                null, // ratingService (non requis : casual)
+                null, // ratingService (not required: casual)
                 new InMemoryReconnectIndex(),
                 60000,
                 2);
@@ -52,7 +52,7 @@ class GameRoomReserveHumanTest {
         ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
         try {
             GameRoom room = newRoom(4, scheduler);
-            room.reserveHuman("Alice", 42L); // prend le siège 0
+            room.reserveHuman("Alice", 42L); // takes seat 0
             int seatForBob = room.addHuman(new FakeSession(), "Bob", 7L);
             assertNotEquals(0, seatForBob, "the reserved seat 0 stays reserved; Bob takes the next seat");
         } finally {

@@ -6,7 +6,7 @@ import io.lettuce.core.api.sync.RedisCommands;
 import io.micronaut.context.annotation.Requires;
 import jakarta.inject.Singleton;
 
-/** Index de reconnexion partagé entre pods (actif dès que {@code redis.uri} est fourni). */
+/** Reconnect index shared across pods (active as soon as {@code redis.uri} is provided). */
 @Singleton
 @Requires(property = "redis.uri")
 public class RedisReconnectIndex implements ReconnectIndex {
@@ -42,7 +42,7 @@ public class RedisReconnectIndex implements ReconnectIndex {
 
     @Override
     public void forget(Long userId, String token, String roomId) {
-        // Suppression conditionnelle : l'entrée peut déjà pointer sur une autre room.
+        // Conditional deletion: the entry may already point to another room.
         if (userId != null && roomId.equals(redis.get(USER + userId))) {
             redis.del(USER + userId);
         }

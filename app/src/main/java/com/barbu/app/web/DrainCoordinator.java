@@ -6,9 +6,9 @@ import io.micronaut.runtime.server.event.ServerShutdownEvent;
 import jakarta.inject.Singleton;
 
 /**
- * À l'arrêt : bascule la readiness en NotReady (k8s cesse de router) PUIS relâche les leases, pour
- * qu'un survivant réhydrate les tables sans fenêtre « redirect vers pod mort ». Le {@code preStop}
- * (sleep) laisse le load-balancer observer le NotReady avant que ce handler ne s'exécute.
+ * On shutdown: flips readiness to NotReady (k8s stops routing) THEN releases the leases, so that a
+ * survivor rehydrates the tables without a "redirect to dead pod" window. The {@code preStop}
+ * (sleep) lets the load-balancer observe the NotReady before this handler runs.
  */
 @Singleton
 public class DrainCoordinator implements ApplicationEventListener<ServerShutdownEvent> {

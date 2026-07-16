@@ -4,12 +4,12 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * File de matchmaking partagée entre pods. Impl mémoire (mono-pod) ou Redis (multi-pod), selon la
- * présence de {@code redis.uri}. Les sockets restent pod-locales : seules ces métadonnées transitent.
+ * Matchmaking queue shared across pods. In-memory impl (single-pod) or Redis (multi-pod), depending
+ * on the presence of {@code redis.uri}. Sockets stay pod-local: only this metadata travels.
  */
 public interface MatchmakingQueue {
 
-    /** {@code rating != null} ⇒ entrée ranked ; {@code rating == null} ⇒ casual (routée par {@code desiredSize}). */
+    /** {@code rating != null} ⇒ ranked entry; {@code rating == null} ⇒ casual (routed by {@code desiredSize}). */
     record Entry(
             String entryId,
             Long userId,
@@ -25,7 +25,7 @@ public interface MatchmakingQueue {
 
     void remove(String entryId);
 
-    /** Prolonge le TTL d'une entrée encore en file (heartbeat du pod home). */
+    /** Extends the TTL of an entry still in the queue (home pod heartbeat). */
     void renew(String entryId, long ttlMs);
 
     List<Entry> casual(int size);
@@ -34,7 +34,7 @@ public interface MatchmakingQueue {
 
     void assign(String entryId, Assignment a, long ttlMs);
 
-    /** Lit et supprime l'assignation (livraison unique). */
+    /** Reads and deletes the assignment (once-only delivery). */
     Optional<Assignment> takeAssignment(String entryId);
 
     int size();

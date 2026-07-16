@@ -4,9 +4,8 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.openapi.annotation.OpenAPIExtraSchema;
 
 /**
- * Commande WebSocket de reprise : le client envoie son resume token (invité) ou rien (compte,
- * identifié par le JWT). Annoté {@link OpenAPIExtraSchema} pour entrer dans le contrat, comme
- * {@code ChatSend}.
+ * WebSocket resume command: the client sends its resume token (guest) or nothing (account,
+ * identified by the JWT). Annotated {@link OpenAPIExtraSchema} to enter the contract.
  */
 @OpenAPIExtraSchema
 public record ResumeCommand(@Nullable String resumeToken) {}

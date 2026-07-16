@@ -24,13 +24,13 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Autorité de matchmaking multi-pod. Chaque tick : (1) livre à ses sockets locales les assignations
- * écrites par le leader (push {@code matched} → le client fait {@code resume} et réclame son siège
- * réservé sur le pod propriétaire) ; (2) s'il détient le lease leader, lit la file partagée, décide
- * via la logique pure ({@link CasualMatchmaker}/{@link RankedMatchmaker}) et forme les tables.
+ * Multi-pod matchmaking authority. Each tick: (1) delivers to its local sockets the assignments
+ * written by the leader (push {@code matched} → the client does {@code resume} and reclaims its
+ * reserved seat on the owner pod); (2) if it holds the leader lease, reads the shared queue, decides
+ * via the pure logic ({@link CasualMatchmaker}/{@link RankedMatchmaker}) and forms the tables.
  *
- * {@code @Context} (bean eager) : le ticker doit tourner dès le démarrage, indépendamment de toute
- * connexion locale — un pod peut être leader et devoir former des tables pour les entrées d'AUTRES pods.
+ * {@code @Context} (eager bean): the ticker must run from startup, independently of any local
+ * connection — a pod can be leader and have to form tables for entries from OTHER pods.
  */
 @Context
 public class MatchmakingCoordinator {
@@ -99,12 +99,12 @@ public class MatchmakingCoordinator {
     public synchronized void enqueueRanked(WebSocketSession session, String name) {
         Long userId = session.get("userId", Long.class).orElse(null);
         if (userId == null) {
-            return; // ranked exige un compte ; le WS a déjà renvoyé l'erreur
+            return; // ranked requires an account; the WS already returned the error
         }
         if (alreadyLocallyQueued(session)) {
             return;
         }
-        // Idempotent par compte à l'échelle du cluster : un second onglet/pod ne crée pas un 2e siège.
+        // Idempotent per account cluster-wide: a second tab/pod does not create a 2nd seat.
         for (Entry e : queue.ranked()) {
             if (userId.equals(e.userId())) {
                 return;
@@ -158,10 +158,10 @@ public class MatchmakingCoordinator {
                     matched.put("type", "matched");
                     matched.put("roomId", a.roomId());
                     matched.put("resumeToken", a.resumeToken());
-                    // `pod` uniquement quand la table vit sur un AUTRE pod que celui du client : il doit
-                    // alors s'y rebrancher via /pod/<pod> (routé par Traefik). Sur le même pod (mono-
-                    // instance incluse), on l'omet et le client réclame son siège sur le socket courant —
-                    // sinon /pod/<pod> pointe vers une route inexistante hors cluster.
+                    // `pod` only when the table lives on a DIFFERENT pod than the client's: it must
+                    // then reconnect to it via /pod/<pod> (routed by Traefik). On the same pod (single
+                    // instance included), we omit it and the client reclaims its seat on the current socket —
+                    // otherwise /pod/<pod> points to a nonexistent route outside the cluster.
                     if (!a.ownerPod().equals(podId)) {
                         matched.put("pod", a.ownerPod());
                     }
@@ -207,7 +207,7 @@ public class MatchmakingCoordinator {
     private void form(int size, String mode, List<Entry> waiting, List<Integer> indices, int botsToAdd) {
         List<Entry> seated = indices.stream().map(waiting::get).toList();
         for (Entry e : seated) {
-            queue.remove(e.entryId()); // retire de la file avant d'asseoir : pas de double-match
+            queue.remove(e.entryId()); // remove from the queue before seating: no double-match
         }
         GameRoom room = rooms.create(size, Variants.DEVELOPER, mode);
         for (Entry e : seated) {
@@ -228,7 +228,7 @@ public class MatchmakingCoordinator {
         try {
             session.sendSync(mapper.writeValueAsString(payload));
         } catch (Exception ignored) {
-            // client parti ; l'assignation a déjà été consommée, le siège réservé bot-fill au besoin
+            // client gone; the assignment has already been consumed, the reserved seat bot-filled if needed
         }
     }
 }

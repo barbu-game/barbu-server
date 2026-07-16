@@ -24,7 +24,7 @@ public final class MontanteRules {
             }
         }
         if (state.aceFollowUp()) {
-            // Bonus d'As : le joueur peut enchaîner une carte ou s'arrêter en passant.
+            // Ace bonus: the player may chain another card or stop by passing.
             playable.add(new Move.Pass());
             return List.copyOf(playable);
         }
@@ -53,13 +53,13 @@ public final class MontanteRules {
                 finishing.add(seat);
             }
             passStreak = 0;
-            // Un As ouvre une enchaîne libre : le joueur garde la main et peut poser autant de
-            // cartes qu'il veut, jusqu'à ce qu'il passe ou n'ait plus de coup jouable.
+            // An Ace opens a free chain: the player keeps the lead and may lay down as many cards
+            // as they want, until they pass or have no playable move left.
             aceFollowUp = (play.card().rank() == Rank.ACE || state.aceFollowUp())
                     && !emptied
                     && canPlayAny(hands.get(seat), board);
         } else if (state.aceFollowUp()) {
-            // Renoncer au bonus d'As ne bloque pas la table : une carte vient d'être posée.
+            // Declining the Ace bonus does not stall the table: a card has just been laid down.
             passStreak = state.passStreak();
         } else {
             passStreak = state.passStreak() + 1;
@@ -84,8 +84,7 @@ public final class MontanteRules {
 
     /**
      * Points locked so far: a seat that has emptied its hand holds a final place, so its montante gain
-     * is fixed the moment it finishes; seats still in play score 0. Agrees with {@link #score} on every
-     * seat already in {@code finishingOrder} and reaches the zero-sum total once the round is settled.
+     * is fixed the moment it finishes; seats still in play score 0.
      */
     public static int[] runningScore(MontanteState state) {
         int[] ranking = ScoringConfig.montanteRanking(state.playerCount());

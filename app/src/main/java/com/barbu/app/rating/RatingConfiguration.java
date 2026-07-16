@@ -4,7 +4,7 @@ import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Value;
 import jakarta.inject.Singleton;
 
-/** Construit l'{@link EloConfig} depuis la configuration (préfixe {@code barbu.elo}). */
+/** Builds the {@link EloConfig} from configuration (prefix {@code barbu.elo}). */
 @Factory
 public class RatingConfiguration {
 

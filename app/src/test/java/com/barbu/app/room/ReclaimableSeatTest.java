@@ -6,7 +6,7 @@ import org.junit.jupiter.api.Test;
 
 class ReclaimableSeatTest {
 
-    // 4 sièges. occupied[s] = une session est active sur ce siège.
+    // 4 seats. occupied[s] = a session is active on this seat.
     private final Long[] userIds = {10L, 20L, null, 30L};
     private final String[] tokens = {"t0", "t1", "t2", "t3"};
 
@@ -25,7 +25,7 @@ class ReclaimableSeatTest {
     @Test
     void token_wins_over_user_id_when_both_match_different_seats() {
         boolean[] occupied = {false, false, false, false};
-        // userId 10 → siège 0 ; token t3 → siège 3. Le token prime.
+        // userId 10 → seat 0; token t3 → seat 3. The token wins.
         assertEquals(3, GameRoom.reclaimableSeat(10L, "t3", userIds, tokens, occupied));
     }
 

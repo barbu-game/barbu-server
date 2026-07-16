@@ -10,10 +10,10 @@ public interface TrickScoringRule {
 
     /**
      * Points locked in so far, given the cards already {@code captured} and those still to be played in
-     * {@code remainingHands}. Invariant (verified by {@code RunningScoreInvariantsTest}): a seat's share
-     * never shrinks in magnitude as play goes on (V1), and equals {@link #score} once the hands are empty
+     * {@code remainingHands}. Invariant: a seat's share never shrinks in magnitude as play goes on (V1),
+     * and equals {@link #score} once the hands are empty
      * (V2); the result is a pure function of its inputs (V3). A rule must only count what can no longer
-     * change — a fixed per-unit barème is already locked, hence the default delegates to {@link #score}.
+     * change — a fixed per-unit scale is already locked, hence the default delegates to {@link #score}.
      */
     default int[] runningScore(TrickOutcome captured, List<List<Card>> remainingHands) {
         return score(captured);

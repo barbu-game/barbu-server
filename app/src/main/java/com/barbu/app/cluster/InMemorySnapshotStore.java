@@ -6,7 +6,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
-/** Stockage de snapshots mono-pod (par défaut, en l'absence de {@code redis.uri}). */
+/** Single-pod snapshot store (default, when {@code redis.uri} is absent). */
 @Singleton
 @Requires(missingProperty = "redis.uri")
 public class InMemorySnapshotStore implements SnapshotStore {

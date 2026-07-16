@@ -3,9 +3,9 @@ package com.barbu.app.room;
 import com.barbu.engine.match.MatchState;
 
 /**
- * État durable d'une table, relocalisable entre pods. Ne contient <b>aucune</b> socket : les
- * sessions WS sont pod-locales et reconstruites au reconnect ; les bots et le timer de tour sont
- * recréés à la réhydratation à partir de {@code match}.
+ * Durable state of a table, relocatable across pods. Contains <b>no</b> socket: the WS sessions are
+ * pod-local and rebuilt on reconnect; the bots and the turn timer are recreated at rehydration from
+ * {@code match}.
  */
 public record GameSnapshot(
         String roomId,
