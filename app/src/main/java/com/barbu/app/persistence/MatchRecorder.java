@@ -11,6 +11,8 @@ import com.barbu.app.persistence.Repositories.RoundScoreRepository;
 import com.barbu.engine.match.MatchEngine;
 import com.barbu.engine.match.MatchState;
 import com.barbu.engine.round.RoundResult;
+import com.barbu.rami.match.RamiMatch;
+import com.barbu.rami.match.RamiMatchEngine;
 import jakarta.inject.Singleton;
 import jakarta.transaction.Transactional;
 import java.time.Instant;
@@ -48,7 +50,8 @@ public class MatchRecorder {
                 RULESET_VERSION,
                 match.seed(),
                 match.variant().id(),
-                Instant.now()));
+                Instant.now(),
+                "BARBU"));
         long gameId = game.id();
 
         List<Integer> standings = MatchEngine.standings(match);
@@ -72,5 +75,25 @@ public class MatchRecorder {
             }
         }
         return gameId;
+    }
+
+    /** Game and final ranking only; per-round Rami scores are not kept in v1. */
+    @Transactional
+    public long recordRami(String mode, RamiMatch match, List<PlayerInfo> players) {
+        GameEntity game = games.save(new GameEntity(
+                null, mode, match.playerCount(), RULESET_VERSION, match.seed(), "rami51", Instant.now(), "RAMI"));
+        List<Integer> standings = RamiMatchEngine.standings(match);
+        for (PlayerInfo p : players) {
+            gamePlayers.save(new GamePlayerEntity(
+                    null,
+                    game.id(),
+                    p.seat(),
+                    p.userId(),
+                    p.displayName(),
+                    p.isBot(),
+                    standings.indexOf(p.seat()) + 1,
+                    match.totals().get(p.seat())));
+        }
+        return game.id();
     }
 }

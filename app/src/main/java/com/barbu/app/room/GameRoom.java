@@ -4,44 +4,21 @@ import com.barbu.app.PlayerNames;
 import com.barbu.app.persistence.MatchRecorder;
 import com.barbu.app.protocol.ChatBroadcast;
 import com.barbu.app.protocol.ChatFilter;
-import com.barbu.app.protocol.Codec;
 import com.barbu.app.protocol.GameStateMessage;
-import com.barbu.app.protocol.GameStateMessage.BoardCell;
-import com.barbu.app.protocol.GameStateMessage.CardView;
-import com.barbu.app.protocol.GameStateMessage.LastRound;
-import com.barbu.app.protocol.GameStateMessage.MoveView;
 import com.barbu.app.protocol.GameStateMessage.PauseVoteState;
 import com.barbu.app.protocol.GameStateMessage.PausedState;
 import com.barbu.app.protocol.GameStateMessage.PlayerInfo;
-import com.barbu.app.protocol.GameStateMessage.Standing;
-import com.barbu.app.protocol.GameStateMessage.TrickView;
-import com.barbu.app.protocol.GameStateMessage.VariantInfo;
 import com.barbu.app.protocol.GameStateMessage.VoteState;
 import com.barbu.app.rating.RatingService;
-import com.barbu.bot.BotStrategy;
-import com.barbu.bot.HeuristicBot;
-import com.barbu.engine.card.Card;
-import com.barbu.engine.match.MatchEngine;
-import com.barbu.engine.match.MatchState;
-import com.barbu.engine.model.DefaultMove;
-import com.barbu.engine.model.Move;
-import com.barbu.engine.round.MontanteRules;
-import com.barbu.engine.round.MontanteState;
-import com.barbu.engine.round.RoundEngine;
-import com.barbu.engine.round.RoundResult;
-import com.barbu.engine.round.RoundState;
-import com.barbu.engine.round.Trick;
-import com.barbu.engine.round.TrickTakingState;
-import com.barbu.engine.scoring.TrickOutcome;
 import com.barbu.engine.variant.Variant;
 import com.barbu.engine.variant.Variants;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micronaut.websocket.WebSocketSession;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.UUID;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -57,7 +34,7 @@ public final class GameRoom {
 
     private final String id;
     private final int playerCount;
-    private final Variant variant;
+    private final GameSession game;
     private final ObjectMapper mapper;
     private final ScheduledExecutorService scheduler;
     private final long botDelayMs;
@@ -65,7 +42,6 @@ public final class GameRoom {
     private final com.barbu.app.metrics.GameMetrics metrics;
     private final String mode;
     private final RatingService ratingService;
-    private final BotStrategy bot = new HeuristicBot();
 
     private static final Logger LOG = LoggerFactory.getLogger(GameRoom.class);
 
@@ -86,10 +62,9 @@ public final class GameRoom {
     private final ReconnectIndex reconnectIndex;
     private final ChatFilter chatFilter = new ChatFilter();
 
-    private MatchState match;
     private boolean recorded;
     private boolean stopped;
-    private boolean trickResolving;
+    private boolean stepPending;
     private boolean voteOpen;
     private Boolean[] votes;
     private ScheduledFuture<?> voteTimeout;
@@ -149,9 +124,39 @@ public final class GameRoom {
             ReconnectIndex reconnectIndex,
             long turnTimeoutMs,
             int turnTimeoutStrikes) {
+        this(
+                id,
+                playerCount,
+                new BarbuSession(playerCount, variant, null),
+                mapper,
+                scheduler,
+                botDelayMs,
+                recorder,
+                metrics,
+                mode,
+                ratingService,
+                reconnectIndex,
+                turnTimeoutMs,
+                turnTimeoutStrikes);
+    }
+
+    GameRoom(
+            String id,
+            int playerCount,
+            GameSession game,
+            ObjectMapper mapper,
+            ScheduledExecutorService scheduler,
+            long botDelayMs,
+            MatchRecorder recorder,
+            com.barbu.app.metrics.GameMetrics metrics,
+            String mode,
+            RatingService ratingService,
+            ReconnectIndex reconnectIndex,
+            long turnTimeoutMs,
+            int turnTimeoutStrikes) {
         this.id = id;
         this.playerCount = playerCount;
-        this.variant = variant;
+        this.game = game;
         this.mapper = mapper;
         this.scheduler = scheduler;
         this.botDelayMs = botDelayMs;
@@ -184,17 +189,7 @@ public final class GameRoom {
     }
 
     public synchronized GameSnapshot snapshot() {
-        return new GameSnapshot(
-                id,
-                playerCount,
-                variant.id(),
-                mode,
-                names.clone(),
-                isBot.clone(),
-                userIds.clone(),
-                resumeTokens.clone(),
-                stopped,
-                match);
+        return game.snapshot(id, mode, names.clone(), isBot.clone(), userIds.clone(), resumeTokens.clone(), stopped);
     }
 
     /**
@@ -216,7 +211,7 @@ public final class GameRoom {
         GameRoom room = new GameRoom(
                 snap.roomId(),
                 snap.playerCount(),
-                Variants.byId(snap.variantId()),
+                sessionFor(snap),
                 mapper,
                 scheduler,
                 botDelayMs,
@@ -231,13 +226,19 @@ public final class GameRoom {
         return room;
     }
 
+    private static GameSession sessionFor(GameSnapshot snap) {
+        if ("RAMI".equals(snap.gameType())) {
+            return new RamiSession(snap.playerCount(), snap.rami());
+        }
+        return new BarbuSession(snap.playerCount(), Variants.byId(snap.variantId()), snap.match());
+    }
+
     private synchronized void restoreState(GameSnapshot snap) {
         System.arraycopy(snap.names(), 0, names, 0, playerCount);
         System.arraycopy(snap.isBot(), 0, isBot, 0, playerCount);
         System.arraycopy(snap.userIds(), 0, userIds, 0, playerCount);
         System.arraycopy(snap.resumeTokens(), 0, resumeTokens, 0, playerCount);
         this.stopped = snap.stopped();
-        this.match = snap.match();
         if (reconnectIndex != null) {
             for (int s = 0; s < playerCount; s++) {
                 reconnectIndex.register(userIds[s], resumeTokens[s], id);
@@ -309,7 +310,7 @@ public final class GameRoom {
     }
 
     public synchronized boolean addBot() {
-        if (match != null) {
+        if (game.isStarted()) {
             return false;
         }
         int seat = firstFreeSeat();
@@ -323,7 +324,7 @@ public final class GameRoom {
 
     /** Host action (gating done in the WS handler): rename a lobby bot. Blank name → no change. */
     public synchronized boolean renameBot(int seat, String name) {
-        if (match != null || seat < 0 || seat >= playerCount || !isBot[seat]) {
+        if (game.isStarted() || seat < 0 || seat >= playerCount || !isBot[seat]) {
             return false;
         }
         String normalized = PlayerNames.normalizeGuest(name);
@@ -335,10 +336,10 @@ public final class GameRoom {
     }
 
     public synchronized boolean start(long seed) {
-        if (match != null || !isFull()) {
+        if (game.isStarted() || !isFull()) {
             return false;
         }
-        match = MatchEngine.newMatch(playerCount, seed, variant);
+        game.start(seed);
         if (metrics != null) {
             metrics.gameStarted();
         }
@@ -347,18 +348,19 @@ public final class GameRoom {
         return true;
     }
 
-    public synchronized void play(int seat, Move move) {
-        if (voteOpen
-                || trickResolving
-                || match == null
-                || match.round() == null
-                || seat != match.round().currentPlayer()
-                || isBot[seat]) {
+    /** Applies a seated human's move; an illegal or malformed one throws and changes nothing. */
+    public synchronized void play(int seat, Map<String, Object> move) {
+        if (voteOpen || stepPending || isBot[seat] || game.currentActor().orElse(-1) != seat) {
+            return;
+        }
+        game.play(seat, move);
+        if (game.currentActor().orElse(-1) == seat) {
+            // Same turn goes on (Rami sub-moves): the deadline covers the whole turn, not each move.
+            broadcast();
             return;
         }
         strikes[seat] = 0;
         cancelTurnTimer();
-        match = MatchEngine.applyMoveNoSettle(match, seat, move);
         afterAdvance();
     }
 
@@ -509,7 +511,7 @@ public final class GameRoom {
             return;
         }
         sessions[seat] = null;
-        if (match != null && !isBot[seat]) {
+        if (game.isStarted() && !isBot[seat]) {
             broadcastSystemChat(seat, names[seat] + " s'est déconnecté");
         }
         // Always rebroadcast so lobby peers see the seat flip to disconnected; the seat stays reserved.
@@ -601,7 +603,7 @@ public final class GameRoom {
 
     /** A human intentionally leaves the lobby: the seat is fully freed for reuse. Lobby-only. */
     public synchronized boolean leave(int seat) {
-        if (match != null || seat < 0 || seat >= playerCount || sessions[seat] == null) {
+        if (game.isStarted() || seat < 0 || seat >= playerCount || sessions[seat] == null) {
             return false;
         }
         if (reconnectIndex != null) {
@@ -616,115 +618,76 @@ public final class GameRoom {
     }
 
     private boolean currentActorIsBot() {
-        if (stopped
-                || voteOpen
-                || trickResolving
-                || match == null
-                || MatchEngine.isComplete(match)
-                || match.round() == null) {
+        if (stopped || voteOpen || stepPending) {
             return false;
         }
-        return isBot[match.round().currentPlayer()];
+        OptionalInt actor = game.currentActor();
+        return actor.isPresent() && isBot[actor.getAsInt()];
     }
 
-    /** Drive the table forward: open the next imposed contract, or let a waiting bot act. */
+    /** Drive the table forward: collect a held step, deal the next round, or let a waiting bot act. */
     private void resume() {
-        if (stopped || voteOpen || pauseVoteOpen || paused || match == null || MatchEngine.isComplete(match)) {
+        if (stopped || voteOpen || pauseVoteOpen || paused || !game.isStarted() || game.isComplete()) {
             return;
         }
-        if (match.round() == null) {
+        if (game.holdStepMs().isPresent()) {
+            scheduleHoldStep();
+        } else if (game.betweenRounds()) {
             // Pause on an empty table so the round-switch recap can be shown before the next deal.
-            scheduler.schedule(this::startContractStep, roundSwitchPauseMs(), TimeUnit.MILLISECONDS);
+            scheduler.schedule(this::startRoundStep, roundSwitchPauseMs(), TimeUnit.MILLISECONDS);
         } else {
             scheduleActor();
         }
     }
 
-    private synchronized void startContractStep() {
-        if (stopped
-                || voteOpen
-                || pauseVoteOpen
-                || paused
-                || match == null
-                || match.round() != null
-                || MatchEngine.isComplete(match)) {
+    private synchronized void startRoundStep() {
+        if (stopped || voteOpen || pauseVoteOpen || paused || !game.betweenRounds()) {
             return;
         }
-        match = MatchEngine.startNextContract(match);
+        game.startNextRound();
         broadcast();
         scheduleActor();
     }
 
     private void afterAdvance() {
-        if (roundJustCompleted()) {
-            broadcast();
-            // Let everyone see the final trick (who took it) before scoring the round.
-            scheduler.schedule(this::settleStep, roundEndPauseMs(), TimeUnit.MILLISECONDS);
-        } else if (trickPending()) {
-            // Hold the finished trick on the table; nobody acts until it is collected.
-            trickResolving = true;
-            broadcast();
-            scheduler.schedule(this::releaseTrick, trickPauseMs(), TimeUnit.MILLISECONDS);
-        } else {
-            broadcast();
-            resume();
-        }
-    }
-
-    private synchronized void releaseTrick() {
-        if (!trickResolving) {
-            return;
-        }
-        trickResolving = false;
-        match = MatchEngine.collectTrick(match);
         broadcast();
-        scheduleActor();
-    }
-
-    private synchronized void settleStep() {
-        if (!roundJustCompleted()) {
-            return;
-        }
-        match = MatchEngine.settle(match);
-        broadcast();
-        if (isVotableBoundary()) {
+        if (game.holdStepMs().isPresent()) {
+            // Hold the finished trick or round on the table; nobody acts until it is collected.
+            scheduleHoldStep();
+        } else if (game.betweenRounds() && isVotableBoundary()) {
             openVote();
         } else {
             resume();
         }
     }
 
-    private boolean roundJustCompleted() {
-        return match != null && MatchEngine.roundOver(match);
+    private void scheduleHoldStep() {
+        if (stepPending) {
+            return;
+        }
+        stepPending = true;
+        scheduler.schedule(this::holdStep, scaled(game.holdStepMs().getAsLong()), TimeUnit.MILLISECONDS);
     }
 
-    /** A trick is finished but still displayed; the taker has not led the next one yet. */
-    private boolean trickPending() {
-        return match != null
-                && match.round() instanceof TrickTakingState t
-                && t.currentTrick().isComplete()
-                && !t.isComplete();
+    private synchronized void holdStep() {
+        if (!stepPending) {
+            return;
+        }
+        stepPending = false;
+        game.runHoldStep();
+        afterAdvance();
     }
 
-    private long trickPauseMs() {
-        return botDelayMs == 0 ? 0 : 2000;
-    }
-
-    private long roundEndPauseMs() {
-        return botDelayMs == 0 ? 0 : 2500;
+    private long scaled(long pauseMs) {
+        return botDelayMs == 0 ? 0 : pauseMs;
     }
 
     private long roundSwitchPauseMs() {
-        return botDelayMs == 0 ? 0 : 3500;
+        return scaled(3500);
     }
 
     private boolean isVotableBoundary() {
-        return !voteOpen
-                && !stopped
-                && match != null
-                && !MatchEngine.isComplete(match)
-                && MatchEngine.isDealerBoundary(match)
-                && humanSeatCount() > 0;
+        return !voteOpen && !stopped && game.atStopVoteBoundary() && humanSeatCount() > 0;
     }
 
     private int humanSeatCount() {
@@ -792,8 +755,8 @@ public final class GameRoom {
                 voteOpen,
                 pauseVoteOpen,
                 paused,
-                match != null && !MatchEngine.isComplete(match),
-                match != null && match.round() == null,
+                game.isStarted() && !game.isComplete(),
+                game.betweenRounds(),
                 humanSeatCount());
     }
 
@@ -874,43 +837,24 @@ public final class GameRoom {
     }
 
     private void armTurnTimer() {
-        if (stopped || voteOpen || trickResolving || match == null) {
+        if (stopped || voteOpen || stepPending) {
             return;
         }
-        RoundState round = match.round();
-        if (round == null || MatchEngine.isComplete(match)) {
+        OptionalInt actor = game.currentActor();
+        if (actor.isEmpty() || isBot[actor.getAsInt()]) {
             return;
         }
-        int seat = round.currentPlayer();
-        if (isBot[seat]) {
-            return;
-        }
+        int seat = actor.getAsInt();
         turnTimeoutSeat = seat;
         turnDeadlineEpochMs = System.currentTimeMillis() + turnTimeoutMs;
         turnTimeout = scheduler.schedule(() -> onTurnTimeout(seat), turnTimeoutMs, TimeUnit.MILLISECONDS);
     }
 
-    private void cancelTurnTimer() {
-        if (turnTimeout != null) {
-            turnTimeout.cancel(false);
-            turnTimeout = null;
-        }
-        turnTimeoutSeat = -1;
-        turnDeadlineEpochMs = 0;
-    }
-
     private synchronized void onTurnTimeout(int seat) {
-        RoundState round = match == null ? null : match.round();
-        if (stopped
-                || voteOpen
-                || trickResolving
-                || round == null
-                || MatchEngine.isComplete(match)
-                || round.currentPlayer() != seat
-                || isBot[seat]) {
+        if (stopped || voteOpen || stepPending || game.currentActor().orElse(-1) != seat || isBot[seat]) {
             return;
         }
-        match = MatchEngine.applyMoveNoSettle(match, seat, DefaultMove.pick(RoundEngine.legalMoves(round, seat)));
+        game.playTimeout(seat);
         if (++strikes[seat] >= turnTimeoutStrikes) {
             isBot[seat] = true;
             abandoned[seat] = true;
@@ -923,9 +867,17 @@ public final class GameRoom {
         if (!currentActorIsBot()) {
             return;
         }
-        int seat = match.round().currentPlayer();
-        match = MatchEngine.applyMoveNoSettle(match, seat, bot.chooseMove(match.round(), seat));
+        game.playBot(game.currentActor().getAsInt());
         afterAdvance();
+    }
+
+    private void cancelTurnTimer() {
+        if (turnTimeout != null) {
+            turnTimeout.cancel(false);
+            turnTimeout = null;
+        }
+        turnTimeoutSeat = -1;
+        turnDeadlineEpochMs = 0;
     }
 
     // A seat is open for a new arrival only if it was never claimed. A disconnected human keeps a
@@ -986,7 +938,7 @@ public final class GameRoom {
     }
 
     private void maybeRecord() {
-        if (recorder == null || recorded || match == null || !(stopped || MatchEngine.isComplete(match))) {
+        if (recorder == null || recorded || !game.isStarted() || !(stopped || game.isComplete())) {
             return;
         }
         recorded = true;
@@ -998,13 +950,13 @@ public final class GameRoom {
             players.add(new MatchRecorder.PlayerInfo(seat, names[seat], isBot[seat], userIds[seat]));
         }
         try {
-            recorder.record(mode, match, players);
+            game.record(recorder, mode, players);
         } catch (Exception e) {
             // persistence is best-effort; a failure must not interrupt play
             LOG.warn("match recording failed for room {} (best-effort, game unaffected)", id, e);
         }
 
-        if (ratingService != null && "ranked".equals(mode) && MatchEngine.isComplete(match)) {
+        if (ratingService != null && "ranked".equals(mode) && game.isComplete()) {
             try {
                 broadcastRankedResult(ratingService.applyRankedResult(eloSeats()));
             } catch (Exception e) {
@@ -1045,7 +997,7 @@ public final class GameRoom {
 
     private List<RatingService.SeatRating> eloSeats() {
         boolean[] abandonedForElo = abandonedForElo();
-        int[] placement = placementsForElo(MatchEngine.standings(match), abandonedForElo);
+        int[] placement = placementsForElo(game.standings(), abandonedForElo);
         List<RatingService.SeatRating> seats = new ArrayList<>(playerCount);
         for (int seat = 0; seat < playerCount; seat++) {
             boolean botForElo = isBot[seat] && !abandonedForElo[seat];
@@ -1060,7 +1012,7 @@ public final class GameRoom {
      */
     public synchronized void recordAbandonmentForfeit() {
         cancelTurnTimer();
-        if (ratingService == null || !"ranked".equals(mode) || match == null || recorded) {
+        if (ratingService == null || !"ranked".equals(mode) || !game.isStarted() || recorded) {
             return;
         }
         recorded = true;
@@ -1090,162 +1042,43 @@ public final class GameRoom {
     }
 
     public synchronized GameStateMessage viewFor(int seat) {
-        String resumeToken = resumeTokens[seat];
-        List<PlayerInfo> players = playersInfo();
-        VariantInfo variantInfo = new VariantInfo(variant.id(), variant.name());
-
-        Integer dealer = null;
-        Integer roundNumber = null;
-        Integer plannedRounds = null;
-        List<Integer> totals = null;
-        List<Standing> standings = null;
-        VoteState stopVote = null;
-        PauseVoteState pauseVote = null;
-        PausedState pausedState = null;
-        Integer currentActor = null;
-        Long turnDeadline = null;
-        String contract = null;
-        List<Integer> handCounts = null;
-        List<CardView> yourHand = null;
-        List<Integer> roundScores = null;
-        List<List<CardView>> captured = null;
-        TrickView trick = null;
-        Map<String, BoardCell> board = null;
-        Boolean resolving = null;
-        String nextContract = null;
-        LastRound lastRound = null;
-        List<MoveView> yourLegalMoves = null;
-
-        if (match != null) {
-            dealer = match.dealer();
-            roundNumber = match.roundNumber();
-            plannedRounds = match.plannedRounds();
-            totals = toList(match.totals());
-
-            if (stopped || MatchEngine.isComplete(match)) {
-                standings = standings();
-            } else {
-                if (voteOpen) {
-                    stopVote = new VoteState(true, humanSeatCount(), yesVotes(votes), isBot[seat] ? null : votes[seat]);
-                }
-                if (pauseVoteOpen) {
-                    pauseVote = new PauseVoteState(
-                            true, humanSeatCount(), yesVotes(pauseVotes), isBot[seat] ? null : pauseVotes[seat]);
-                }
-                if (paused) {
-                    pausedState = new PausedState(true, pauseEndsAtMs);
-                }
-
-                RoundState round = match.round();
-                if (round == null) {
-                    currentActor = match.dealer();
-                    nextContract = MatchEngine.nextContract(match).name();
-                    if (!match.history().isEmpty()) {
-                        lastRound = lastRoundView();
-                    }
-                } else {
-                    currentActor = round.currentPlayer();
-                    if (turnDeadlineEpochMs > 0 && round.currentPlayer() == turnTimeoutSeat) {
-                        turnDeadline = turnDeadlineEpochMs;
-                    }
-                    contract = round.contract().name();
-                    handCounts = handCounts(round);
-                    yourHand = handViews(handsOf(round).get(seat));
-
-                    if (round instanceof TrickTakingState t) {
-                        trick = trickView(t.currentTrick());
-                        int[] running = match.variant()
-                                .trickRules()
-                                .get(t.contract())
-                                .runningScore(
-                                        new TrickOutcome(t.captured(), t.trickTakers(), playerCount),
-                                        notYetCaptured(t));
-                        List<Integer> rs = new ArrayList<>();
-                        for (int s = 0; s < playerCount; s++) {
-                            rs.add(running[s]);
-                        }
-                        roundScores = rs;
-                        captured = capturedPerSeat(t);
-                    } else if (round instanceof MontanteState m) {
-                        board = Codec.boardView(m.board());
-                        int[] running = MontanteRules.runningScore(m);
-                        List<Integer> rs = new ArrayList<>();
-                        for (int s = 0; s < playerCount; s++) {
-                            rs.add(running[s]);
-                        }
-                        roundScores = rs;
-                    }
-
-                    if (trickResolving) {
-                        resolving = true;
-                    } else if (round.currentPlayer() == seat) {
-                        List<MoveView> moves = new ArrayList<>();
-                        for (Move move : RoundEngine.legalMoves(round, seat)) {
-                            moves.add(Codec.moveView(move));
-                        }
-                        yourLegalMoves = moves;
-                    }
-                }
-            }
-        }
-
-        return new GameStateMessage(
-                "state",
+        boolean finished = game.isStarted() && (stopped || game.isComplete());
+        boolean live = game.isStarted() && !finished;
+        VoteState stopVote = live && voteOpen
+                ? new VoteState(true, humanSeatCount(), yesVotes(votes), isBot[seat] ? null : votes[seat])
+                : null;
+        PauseVoteState pauseVote = live && pauseVoteOpen
+                ? new PauseVoteState(
+                        true, humanSeatCount(), yesVotes(pauseVotes), isBot[seat] ? null : pauseVotes[seat])
+                : null;
+        PausedState pausedState = live && paused ? new PausedState(true, pauseEndsAtMs) : null;
+        OptionalInt actor = game.currentActor();
+        Long turnDeadline = turnDeadlineEpochMs > 0 && actor.isPresent() && actor.getAsInt() == turnTimeoutSeat
+                ? turnDeadlineEpochMs
+                : null;
+        return game.view(new RoomContext(
                 id,
                 playerCount,
                 seat,
-                resumeToken,
+                resumeTokens[seat],
                 phase(),
-                players,
-                variantInfo,
-                dealer,
-                roundNumber,
-                plannedRounds,
-                totals,
-                standings,
+                playersInfo(),
+                names.clone(),
+                finished,
                 stopVote,
                 pauseVote,
                 pausedState,
-                currentActor,
-                turnDeadline,
-                contract,
-                handCounts,
-                yourHand,
-                roundScores,
-                captured,
-                trick,
-                board,
-                resolving,
-                nextContract,
-                lastRound,
-                yourLegalMoves);
-    }
-
-    /**
-     * Every card not yet in a captured pile, grouped by seat: each hand plus the card that seat has
-     * already laid into the in-progress trick. Counting those laid cards keeps the running score
-     * spread over the round's full unit count instead of flickering as the trick fills and resolves.
-     */
-    private static List<List<Card>> notYetCaptured(TrickTakingState t) {
-        List<List<Card>> remaining = new ArrayList<>();
-        for (List<Card> hand : t.hands()) {
-            remaining.add(new ArrayList<>(hand));
-        }
-        Trick trick = t.currentTrick();
-        for (int i = 0; i < trick.cards().size(); i++) {
-            remaining.get(trick.playerAt(i)).add(trick.cards().get(i));
-        }
-        return remaining;
+                turnDeadline));
     }
 
     private String phase() {
-        if (match == null) {
+        if (!game.isStarted()) {
             return "LOBBY";
         }
-        if (stopped || MatchEngine.isComplete(match)) {
+        if (stopped || game.isComplete()) {
             return "GAME_OVER";
         }
-        return match.round() == null ? "CONTRACT_SELECTION" : "PLAYING";
+        return game.betweenRounds() ? "CONTRACT_SELECTION" : "PLAYING";
     }
 
     private List<PlayerInfo> playersInfo() {
@@ -1259,86 +1092,5 @@ public final class GameRoom {
             players.add(new PlayerInfo(seat, name, isBot[seat], connected));
         }
         return players;
-    }
-
-    /** Recap of the just-finished round: who scored what, ranked on that round alone. */
-    private LastRound lastRoundView() {
-        List<RoundResult> history = match.history();
-        RoundResult last = history.get(history.size() - 1);
-        int[] points = last.points();
-
-        List<Integer> order = new ArrayList<>();
-        for (int s = 0; s < playerCount; s++) {
-            order.add(s);
-        }
-        order.sort(Comparator.comparingInt((Integer s) -> points[s]).reversed());
-
-        List<LastRound.RankRow> ranking = new ArrayList<>();
-        for (int rank = 0; rank < order.size(); rank++) {
-            int s = order.get(rank);
-            ranking.add(new LastRound.RankRow(rank + 1, s, names[s], points[s]));
-        }
-        return new LastRound(last.contract().name(), ranking);
-    }
-
-    private List<Standing> standings() {
-        List<Standing> standings = new ArrayList<>();
-        List<Integer> order = MatchEngine.standings(match);
-        for (int rank = 0; rank < order.size(); rank++) {
-            int seat = order.get(rank);
-            standings.add(new Standing(rank + 1, seat, names[seat], match.totals()[seat]));
-        }
-        return standings;
-    }
-
-    private TrickView trickView(Trick trick) {
-        List<TrickView.TrickPlay> plays = new ArrayList<>();
-        for (int i = 0; i < trick.cards().size(); i++) {
-            plays.add(new TrickView.TrickPlay(
-                    trick.playerAt(i), Codec.cardView(trick.cards().get(i))));
-        }
-        if (trick.isComplete()) {
-            return new TrickView(trick.leader(), plays, true, trick.taker());
-        }
-        return new TrickView(trick.leader(), plays, null, null);
-    }
-
-    private static List<List<Card>> handsOf(RoundState round) {
-        return switch (round) {
-            case TrickTakingState t -> t.hands();
-            case MontanteState m -> m.hands();
-        };
-    }
-
-    private static List<Integer> handCounts(RoundState round) {
-        List<Integer> counts = new ArrayList<>();
-        for (List<Card> hand : handsOf(round)) {
-            counts.add(hand.size());
-        }
-        return counts;
-    }
-
-    private static List<CardView> handViews(List<Card> hand) {
-        List<CardView> cards = new ArrayList<>();
-        for (Card card : hand) {
-            cards.add(Codec.cardView(card));
-        }
-        return cards;
-    }
-
-    private static List<List<CardView>> capturedPerSeat(TrickTakingState t) {
-        List<List<CardView>> out = new ArrayList<>();
-        for (List<Card> seatCards : t.captured()) {
-            out.add(handViews(seatCards));
-        }
-        return out;
-    }
-
-    private static List<Integer> toList(int[] values) {
-        List<Integer> list = new ArrayList<>(values.length);
-        for (int v : values) {
-            list.add(v);
-        }
-        return list;
     }
 }

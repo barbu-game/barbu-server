@@ -46,7 +46,9 @@ public record GameStateMessage(
         @Nullable Boolean resolving,
         @Nullable String nextContract,
         @Nullable LastRound lastRound,
-        @Nullable List<MoveView> yourLegalMoves) {
+        @Nullable List<MoveView> yourLegalMoves,
+        String gameType,
+        @Nullable RamiView rami) {
 
     public record PlayerInfo(int seat, String name, boolean bot, boolean connected) {}
 
