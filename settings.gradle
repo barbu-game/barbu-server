@@ -1,4 +1,5 @@
 rootProject.name = 'barbu-server'
 include 'game-engine'
+include 'rami-engine'
 include 'bot'
 include 'app'
