@@ -57,6 +57,8 @@ class GameStateMessageSerializationTest {
                 null,
                 null,
                 null,
+                null,
+                "BARBU",
                 null);
 
         JsonNode json = serialize(lobby);

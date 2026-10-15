@@ -5,6 +5,7 @@ import com.barbu.app.cluster.SnapshotStore;
 import com.barbu.app.persistence.MatchRecorder;
 import com.barbu.app.rating.RatingService;
 import com.barbu.engine.variant.Variant;
+import com.barbu.rami.round.RamiRoundEngine;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micronaut.context.annotation.Value;
 import jakarta.annotation.PreDestroy;
@@ -77,9 +78,8 @@ public class RoomManager {
 
     public GameRoom create(int requestedPlayerCount, Variant variant, String mode) {
         int playerCount = Math.clamp(requestedPlayerCount, 2, 10);
-        String id = newCode();
-        GameRoom room = new GameRoom(
-                id,
+        return register(new GameRoom(
+                newCode(),
                 playerCount,
                 variant,
                 mapper,
@@ -91,9 +91,30 @@ public class RoomManager {
                 ratingService,
                 reconnectIndex,
                 turnTimeoutMs,
-                turnTimeoutStrikes);
-        rooms.put(id, room);
-        registry.tryClaim(id, podId, LEASE_TTL_MS);
+                turnTimeoutStrikes));
+    }
+
+    public GameRoom createRami(int requestedPlayerCount) {
+        int playerCount = Math.clamp(requestedPlayerCount, RamiRoundEngine.MIN_PLAYERS, RamiRoundEngine.MAX_PLAYERS);
+        return register(new GameRoom(
+                newCode(),
+                playerCount,
+                new RamiSession(playerCount, null),
+                mapper,
+                scheduler,
+                botDelayMs,
+                recorder,
+                metrics,
+                "private",
+                ratingService,
+                reconnectIndex,
+                turnTimeoutMs,
+                turnTimeoutStrikes));
+    }
+
+    private GameRoom register(GameRoom room) {
+        rooms.put(room.id(), room);
+        registry.tryClaim(room.id(), podId, LEASE_TTL_MS);
         room.setOnStateChanged(() -> persist(room));
         persist(room);
         return room;

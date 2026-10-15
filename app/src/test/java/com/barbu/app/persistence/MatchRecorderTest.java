@@ -52,6 +52,45 @@ class MatchRecorderTest {
         assertNotNull(winner.displayName());
     }
 
+    @Test
+    void barbu_games_are_tagged_barbu() {
+        long gameId = recorder.record(
+                "private",
+                playFull(3, 7L),
+                List.of(
+                        new PlayerInfo(0, "Alice", false, null),
+                        new PlayerInfo(1, "Bot 1", true, null),
+                        new PlayerInfo(2, "Bot 2", true, null)));
+        assertEquals("BARBU", games.findById(gameId).orElseThrow().gameType());
+    }
+
+    @Test
+    void records_a_rami_game_and_its_ranking() {
+        com.barbu.rami.match.RamiMatch rami =
+                com.barbu.bot.rami.RamiSimulator.play(4, 3L, new com.barbu.bot.rami.RamiBot());
+        long gameId = recorder.recordRami(
+                "private",
+                rami,
+                List.of(
+                        new PlayerInfo(0, "Alice", false, null),
+                        new PlayerInfo(1, "Bot 1", true, null),
+                        new PlayerInfo(2, "Bot 2", true, null),
+                        new PlayerInfo(3, "Bot 3", true, null)));
+
+        var game = games.findById(gameId).orElseThrow();
+        assertEquals("RAMI", game.gameType());
+        assertEquals("rami51", game.variant());
+        assertEquals(4, count(gamePlayers.findByGameId(gameId)));
+        assertEquals(0, count(rounds.findByGameId(gameId)));
+        int winner = com.barbu.rami.match.RamiMatchEngine.standings(rami).get(0);
+        var first = StreamSupport.stream(gamePlayers.findByGameId(gameId).spliterator(), false)
+                .filter(p -> p.finalRank() == 1)
+                .findFirst()
+                .orElseThrow();
+        assertEquals(winner, first.seat());
+        assertEquals((int) rami.totals().get(winner), first.finalScore());
+    }
+
     private static MatchState playFull(int n, long seed) {
         MatchState m = MatchEngine.newMatch(n, seed);
         while (!MatchEngine.isComplete(m)) {

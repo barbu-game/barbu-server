@@ -3,7 +3,6 @@ package com.barbu.app.ws;
 import com.barbu.app.auth.JwtVerifier;
 import com.barbu.app.persistence.Repositories.UserRepository;
 import com.barbu.app.protocol.ChatSend;
-import com.barbu.app.protocol.Codec;
 import com.barbu.app.protocol.Redirect;
 import com.barbu.app.protocol.ResumeCommand;
 import com.barbu.app.room.GameRoom;
@@ -11,6 +10,7 @@ import com.barbu.app.room.MatchmakingCoordinator;
 import com.barbu.app.room.RoomManager;
 import com.barbu.engine.variant.Variant;
 import com.barbu.engine.variant.Variants;
+import com.barbu.rami.round.RamiRoundEngine;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micronaut.security.annotation.Secured;
 import io.micronaut.security.rules.SecurityRule;
@@ -82,13 +82,18 @@ public class GameWebSocket {
             case "auth" -> authenticate(session, asString(command.get("token")));
             case "createRoom" -> {
                 authenticate(session, asString(command.get("token")));
-                String variantId = asString(command.get("variant"));
-                Variant variant = variantId == null ? Variants.DEVELOPER : Variants.byId(variantId);
-                if (variant == null) {
-                    sendError(session, "unknown variant: " + variantId);
-                    return;
+                GameRoom room;
+                if ("RAMI".equals(asString(command.get("gameType")))) {
+                    room = rooms.createRami(asInt(command.get("playerCount"), RamiRoundEngine.MAX_PLAYERS));
+                } else {
+                    String variantId = asString(command.get("variant"));
+                    Variant variant = variantId == null ? Variants.DEVELOPER : Variants.byId(variantId);
+                    if (variant == null) {
+                        sendError(session, "unknown variant: " + variantId);
+                        return;
+                    }
+                    room = rooms.create(asInt(command.get("playerCount"), 4), variant);
                 }
-                GameRoom room = rooms.create(asInt(command.get("playerCount"), 4), variant);
                 int seat = room.addHuman(session, accountNameOr(session, command.get("name")), accountId(session));
                 bind(session, room.id(), seat);
                 sendJoined(session, room.id(), seat);
@@ -174,9 +179,13 @@ public class GameWebSocket {
                     }
                 });
             case "play" ->
-                withRoomSeat(
-                        session,
-                        (room, seat) -> room.play(seat, Codec.parseMove((Map<String, Object>) command.get("move"))));
+                withRoomSeat(session, (room, seat) -> {
+                    try {
+                        room.play(seat, (Map<String, Object>) command.get("move"));
+                    } catch (IllegalArgumentException | IllegalStateException | ClassCastException e) {
+                        sendError(session, "illegal move: " + e.getMessage());
+                    }
+                });
             case "castStopVote" ->
                 withRoomSeat(
                         session, (room, seat) -> room.castStopVote(seat, Boolean.TRUE.equals(command.get("stop"))));
