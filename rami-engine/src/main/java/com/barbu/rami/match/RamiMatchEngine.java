@@ -38,7 +38,8 @@ public final class RamiMatchEngine {
         int number = m.roundNumber() + 1;
         int dealer = (number - 1) % m.playerCount();
         RamiRound round = RamiRoundEngine.deal(m.playerCount(), dealer, m.seed() * 31 + number);
-        return new RamiMatch(m.playerCount(), m.totalRounds(), m.seed(), number, m.totals(), round, m.lastRound());
+        return new RamiMatch(
+                m.playerCount(), m.totalRounds(), m.seed(), number, m.totals(), round, m.lastRound(), m.history());
     }
 
     public static RamiMatch apply(RamiMatch m, int seat, RamiMove move) {
@@ -48,15 +49,31 @@ public final class RamiMatchEngine {
         RamiRound round = RamiRoundEngine.apply(m.round(), seat, move);
         if (round.phase() != Phase.FINISHED) {
             return new RamiMatch(
-                    m.playerCount(), m.totalRounds(), m.seed(), m.roundNumber(), m.totals(), round, m.lastRound());
+                    m.playerCount(),
+                    m.totalRounds(),
+                    m.seed(),
+                    m.roundNumber(),
+                    m.totals(),
+                    round,
+                    m.lastRound(),
+                    m.history());
         }
         RoundSummary summary = settle(round);
         List<Integer> totals = new ArrayList<>(m.totals());
         for (int s = 0; s < totals.size(); s++) {
             totals.set(s, totals.get(s) + summary.penalties().get(s));
         }
+        List<RoundSummary> history = new ArrayList<>(m.history());
+        history.add(summary);
         return new RamiMatch(
-                m.playerCount(), m.totalRounds(), m.seed(), m.roundNumber(), List.copyOf(totals), null, summary);
+                m.playerCount(),
+                m.totalRounds(),
+                m.seed(),
+                m.roundNumber(),
+                List.copyOf(totals),
+                null,
+                summary,
+                history);
     }
 
     public static RoundSummary settle(RamiRound round) {

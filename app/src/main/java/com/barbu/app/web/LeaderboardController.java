@@ -21,7 +21,8 @@ public class LeaderboardController {
     }
 
     @Get
-    public List<LeaderboardRow> top(@QueryValue(defaultValue = "50") int limit) {
-        return ratings.topPlayers(Math.clamp(limit, 1, 200));
+    public List<LeaderboardRow> top(
+            @QueryValue(defaultValue = "50") int limit, @QueryValue(defaultValue = "BARBU") String game) {
+        return ratings.topPlayers(game, Math.clamp(limit, 1, 200));
     }
 }

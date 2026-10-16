@@ -26,11 +26,20 @@ public final class RamiBot {
         if (opened && !round.mustPlay().isEmpty()) {
             List<RamiCard> pending =
                     hand.stream().filter(c -> round.mustPlay().contains(c.id())).toList();
-            return layOff(round, hand, pending).orElse(new RamiMove.ResetTurn());
+            Optional<RamiMove> lay = layOff(round, hand, pending);
+            if (lay.isPresent()) {
+                return lay.get();
+            }
+            for (List<RamiCard> meld : MeldFinder.find(hand)) {
+                if (meld.size() < hand.size() && meld.stream().anyMatch(pending::contains)) {
+                    return new RamiMove.NewMeld(ids(meld));
+                }
+            }
+            return new RamiMove.ResetTurn();
         }
         List<List<RamiCard>> melds = MeldFinder.find(hand);
         if (!opened) {
-            List<List<RamiCard>> opening = opening(melds, hand.size());
+            List<List<RamiCard>> opening = bestOpening(hand);
             Set<Integer> laid =
                     opening.stream().flatMap(List::stream).map(RamiCard::id).collect(Collectors.toSet());
             if (!opening.isEmpty() && laid.containsAll(round.mustPlay())) {
@@ -49,8 +58,46 @@ public final class RamiBot {
             if (lay.isPresent()) {
                 return lay.get();
             }
+            Optional<RamiMove> swap = jokerSwap(round, hand);
+            if (swap.isPresent()) {
+                return swap.get();
+            }
         }
         return new RamiMove.Discard(worstCard(hand, melds, opened).id());
+    }
+
+    // Only take a joker back when another meld can take it right away: it must be replayed this turn.
+    private static Optional<RamiMove> jokerSwap(RamiRound round, List<RamiCard> hand) {
+        if (hand.size() < 2) {
+            return Optional.empty(); // the joker could not be laid off without emptying the hand
+        }
+        for (Meld meld : round.melds()) {
+            int at = -1;
+            for (int i = 0; i < meld.cards().size(); i++) {
+                if (meld.cards().get(i).isJoker()) {
+                    at = i;
+                }
+            }
+            if (at < 0) {
+                continue;
+            }
+            RamiCard joker = meld.cards().get(at);
+            boolean reusable = round.melds().stream().anyMatch(m -> m.id() != meld.id() && extension(m, joker) != null);
+            if (!reusable) {
+                continue;
+            }
+            for (RamiCard card : hand) {
+                if (card.isJoker()) {
+                    continue;
+                }
+                List<RamiCard> swapped = new ArrayList<>(meld.cards());
+                swapped.set(at, card);
+                if (MeldRules.kind(swapped).orElse(null) == meld.kind()) {
+                    return Optional.of(new RamiMove.SwapJoker(meld.id(), card.id()));
+                }
+            }
+        }
+        return Optional.empty();
     }
 
     private static boolean discardFits(RamiRound round, List<RamiCard> hand) {
@@ -68,7 +115,7 @@ public final class RamiBot {
         RamiCard top = round.discard().get(round.discard().size() - 1);
         List<RamiCard> withTop = new ArrayList<>(hand);
         withTop.add(top);
-        return opening(MeldFinder.find(withTop), withTop.size()).stream().anyMatch(m -> m.contains(top));
+        return bestOpening(withTop).stream().anyMatch(m -> m.contains(top));
     }
 
     private static RamiMove.LayOff extension(Meld meld, RamiCard card) {
@@ -100,25 +147,31 @@ public final class RamiBot {
         return Optional.empty();
     }
 
-    private static List<List<RamiCard>> opening(List<List<RamiCard>> melds, int handSize) {
-        List<List<RamiCard>> byValue = new ArrayList<>(melds);
-        byValue.sort(Comparator.comparingInt((List<RamiCard> m) -> MeldRules.points(m))
-                .reversed());
-        List<List<RamiCard>> chosen = new ArrayList<>();
-        int used = 0;
-        int total = 0;
-        for (List<RamiCard> meld : byValue) {
-            if (used + meld.size() >= handSize) {
-                continue;
-            }
-            chosen.add(meld);
-            used += meld.size();
-            total += MeldRules.points(meld);
-            if (total >= RamiRoundEngine.OPENING_MIN) {
-                return chosen;
+    /** Highest-scoring set of disjoint melds worth 51+ that keeps a card, over both decompositions. */
+    static List<List<RamiCard>> bestOpening(List<RamiCard> hand) {
+        List<List<RamiCard>> best = List.of();
+        int bestPoints = RamiRoundEngine.OPENING_MIN - 1;
+        for (boolean setsFirst : new boolean[] {false, true}) {
+            List<List<RamiCard>> melds = MeldFinder.find(hand, setsFirst);
+            // At most a handful of melds fit in 14 cards, so every subset is cheap to try.
+            for (int mask = 1; mask < (1 << melds.size()); mask++) {
+                List<List<RamiCard>> chosen = new ArrayList<>();
+                int used = 0;
+                int points = 0;
+                for (int k = 0; k < melds.size(); k++) {
+                    if ((mask & (1 << k)) != 0) {
+                        chosen.add(melds.get(k));
+                        used += melds.get(k).size();
+                        points += MeldRules.points(melds.get(k));
+                    }
+                }
+                if (used < hand.size() && points > bestPoints) {
+                    best = chosen;
+                    bestPoints = points;
+                }
             }
         }
-        return List.of();
+        return best;
     }
 
     // Before opening, high cards are what reaches 51; after, they are what costs penalties.

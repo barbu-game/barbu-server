@@ -44,4 +44,7 @@ public final class Entities {
 
     @MappedEntity("player_ratings")
     public record PlayerRatingEntity(@Id Long userId, int rating, int gamesPlayed, Instant updatedAt) {}
+
+    @MappedEntity("rami_ratings")
+    public record RamiRatingEntity(@Id Long userId, int rating, int gamesPlayed, Instant updatedAt) {}
 }

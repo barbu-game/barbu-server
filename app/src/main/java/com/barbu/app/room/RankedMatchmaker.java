@@ -33,7 +33,10 @@ public final class RankedMatchmaker {
      * fits within the common window; otherwise a bot-fill if a low-ELO table has waited long enough.
      */
     public static Optional<Formation> decideFormation(List<Candidate> waiting, long now, EloConfig cfg) {
-        int size = cfg.rankedTableSize();
+        return decideFormation(waiting, now, cfg, cfg.rankedTableSize());
+    }
+
+    public static Optional<Formation> decideFormation(List<Candidate> waiting, long now, EloConfig cfg, int size) {
 
         // 1) Full table of humans: sort by rating, look for a contiguous segment of `size`
         //    whose spread (upper bound - lower bound) <= the smallest window in the segment.

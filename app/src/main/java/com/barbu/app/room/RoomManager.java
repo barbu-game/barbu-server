@@ -95,6 +95,10 @@ public class RoomManager {
     }
 
     public GameRoom createRami(int requestedPlayerCount) {
+        return createRami(requestedPlayerCount, "private");
+    }
+
+    public GameRoom createRami(int requestedPlayerCount, String mode) {
         int playerCount = Math.clamp(requestedPlayerCount, RamiRoundEngine.MIN_PLAYERS, RamiRoundEngine.MAX_PLAYERS);
         return register(new GameRoom(
                 newCode(),
@@ -105,7 +109,7 @@ public class RoomManager {
                 botDelayMs,
                 recorder,
                 metrics,
-                "private",
+                mode,
                 ratingService,
                 reconnectIndex,
                 turnTimeoutMs,

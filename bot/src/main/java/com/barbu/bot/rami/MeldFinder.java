@@ -16,8 +16,18 @@ final class MeldFinder {
     private MeldFinder() {}
 
     static List<List<RamiCard>> find(List<RamiCard> hand) {
+        return find(hand, false);
+    }
+
+    /** {@code setsFirst} gives the other decomposition when a card could join a run or a set. */
+    static List<List<RamiCard>> find(List<RamiCard> hand, boolean setsFirst) {
         List<RamiCard> pool = new ArrayList<>(hand);
         List<List<RamiCard>> melds = new ArrayList<>();
+        if (setsFirst) {
+            for (List<RamiCard> m = bestSet(pool); m != null; m = bestSet(pool)) {
+                take(pool, melds, m);
+            }
+        }
         for (List<RamiCard> m = longestRun(pool); m != null; m = longestRun(pool)) {
             take(pool, melds, m);
         }

@@ -62,4 +62,17 @@ class RankedMatchmakerDecisionTest {
         List<Candidate> waiting = List.of(new Candidate(1000, 0));
         assertTrue(RankedMatchmaker.decideFormation(waiting, 10000L, cfg).isEmpty());
     }
+
+    @Test
+    void an_explicit_table_size_overrides_the_configured_one() {
+        List<Candidate> waiting = List.of(
+                new Candidate(1000, 0),
+                new Candidate(1010, 0),
+                new Candidate(1020, 0),
+                new Candidate(1030, 0),
+                new Candidate(1040, 0));
+        Optional<Formation> f = RankedMatchmaker.decideFormation(waiting, 1000L, cfg, 5);
+        assertTrue(f.isPresent());
+        assertEquals(5, f.get().indices().size());
+    }
 }

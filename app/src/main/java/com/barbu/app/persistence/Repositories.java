@@ -3,6 +3,7 @@ package com.barbu.app.persistence;
 import com.barbu.app.persistence.Entities.GameEntity;
 import com.barbu.app.persistence.Entities.GamePlayerEntity;
 import com.barbu.app.persistence.Entities.PlayerRatingEntity;
+import com.barbu.app.persistence.Entities.RamiRatingEntity;
 import com.barbu.app.persistence.Entities.RoundEntity;
 import com.barbu.app.persistence.Entities.RoundScoreEntity;
 import com.barbu.app.persistence.Entities.UserEntity;
@@ -42,5 +43,10 @@ public final class Repositories {
     @JdbcRepository(dialect = Dialect.POSTGRES)
     public interface PlayerRatingRepository extends CrudRepository<PlayerRatingEntity, Long> {
         List<PlayerRatingEntity> findAllOrderByRatingDesc(Pageable pageable);
+    }
+
+    @JdbcRepository(dialect = Dialect.POSTGRES)
+    public interface RamiRatingRepository extends CrudRepository<RamiRatingEntity, Long> {
+        List<RamiRatingEntity> findAllOrderByRatingDesc(Pageable pageable);
     }
 }

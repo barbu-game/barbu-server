@@ -61,4 +61,23 @@ class RamiWebSocketIntegrationTest {
             server.stop();
         }
     }
+
+    @Test
+    void quick_match_forms_a_rami_table_filled_with_bots() throws Exception {
+        EmbeddedServer server = ApplicationContext.run(
+                EmbeddedServer.class,
+                Map.of("POD_ID", "local", "barbu.bot-delay-ms", 3_600_000, "barbu.mm.fill-timeout-ms", 300));
+        try (TestGameClient player = connect(server)) {
+            player.sendJson(Map.of("type", "enqueueMatchmaking", "gameType", "RAMI", "size", 9, "name", "Solo"));
+            JsonNode matched = player.await(m -> m.path("type").asText().equals("matched"));
+            player.sendJson(Map.of(
+                    "type", "resume", "resumeToken", matched.path("resumeToken").asText()));
+            JsonNode state =
+                    player.await(m -> isState(m) && !m.path("phase").asText().equals("LOBBY"));
+            assertEquals("RAMI", state.path("gameType").asText());
+            assertEquals(5, state.path("playerCount").asInt(), "a Rami table is 4 or 5 seats");
+        } finally {
+            server.stop();
+        }
+    }
 }

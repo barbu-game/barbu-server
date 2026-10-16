@@ -74,4 +74,19 @@ class RatingServiceTest {
             assertTrue(top.get(i - 1).rating() >= top.get(i).rating());
         }
     }
+
+    @Test
+    void rami_ratings_are_independent_from_barbu_ratings() {
+        long a = newUser("rami-a-" + System.nanoTime());
+        long b = newUser("rami-b-" + System.nanoTime());
+        List<RatingUpdate> updates = ratings.applyRankedResult(
+                "RAMI", List.of(new SeatRating(0, a, false, 1), new SeatRating(1, b, false, 2)));
+        assertTrue(ratings.ratingOf(a, "RAMI") > 1000);
+        assertEquals(1000, ratings.ratingOf(a, "BARBU"), "a Rami win leaves the Barbu rating untouched");
+        assertEquals(updates.get(0).after(), ratings.ratingOf(a, "RAMI"));
+        assertTrue(ratings.topPlayers("RAMI", 50).stream()
+                .anyMatch(r -> r.username().startsWith("rami-a-")));
+        assertTrue(ratings.topPlayers("BARBU", 50).stream()
+                .noneMatch(r -> r.username().startsWith("rami-a-")));
+    }
 }

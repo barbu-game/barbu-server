@@ -123,10 +123,14 @@ public class GameWebSocket {
                         sendError(session, "account required for ranked");
                         return;
                     }
-                    coordinator.enqueueRanked(session, accountNameOr(session, command.get("name")));
+                    coordinator.enqueueRanked(
+                            session, accountNameOr(session, command.get("name")), asString(command.get("gameType")));
                 } else {
                     coordinator.enqueueCasual(
-                            session, accountNameOr(session, command.get("name")), asInt(command.get("size"), 4));
+                            session,
+                            accountNameOr(session, command.get("name")),
+                            asInt(command.get("size"), 4),
+                            asString(command.get("gameType")));
                 }
             }
             case "cancelMatchmaking" -> coordinator.cancel(session);

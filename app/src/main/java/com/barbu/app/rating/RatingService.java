@@ -1,8 +1,10 @@
 package com.barbu.app.rating;
 
 import com.barbu.app.persistence.Entities.PlayerRatingEntity;
+import com.barbu.app.persistence.Entities.RamiRatingEntity;
 import com.barbu.app.persistence.Entities.UserEntity;
 import com.barbu.app.persistence.Repositories.PlayerRatingRepository;
+import com.barbu.app.persistence.Repositories.RamiRatingRepository;
 import com.barbu.app.persistence.Repositories.UserRepository;
 import com.barbu.app.rating.EloCalculator.Participant;
 import io.micronaut.data.model.Pageable;
@@ -13,17 +15,25 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-/** Facade between the pure ELO computation and the persistence of account ratings. */
+/**
+ * Facade between the pure ELO computation and the persistence of account ratings. Each game keeps its
+ * own ladder: Barbu in {@code player_ratings}, Rami in {@code rami_ratings}.
+ */
 @Singleton
 public class RatingService {
 
+    private static final String RAMI = "RAMI";
+
     private final PlayerRatingRepository ratings;
+    private final RamiRatingRepository ramiRatings;
     private final UserRepository users;
     private final EloCalculator calculator;
     private final EloConfig config;
 
-    public RatingService(PlayerRatingRepository ratings, UserRepository users, EloConfig config) {
+    public RatingService(
+            PlayerRatingRepository ratings, RamiRatingRepository ramiRatings, UserRepository users, EloConfig config) {
         this.ratings = ratings;
+        this.ramiRatings = ramiRatings;
         this.users = users;
         this.config = config;
         this.calculator = new EloCalculator(config);
@@ -37,12 +47,29 @@ public class RatingService {
 
     public record LeaderboardRow(int rank, String username, int rating, int gamesPlayed) {}
 
+    private record Row(long userId, int rating, int gamesPlayed) {}
+
     public int ratingOf(long userId) {
-        return ratings.findById(userId).map(PlayerRatingEntity::rating).orElse(config.initialRating());
+        return ratingOf(userId, "BARBU");
     }
 
-    private int gamesOf(long userId) {
-        return ratings.findById(userId).map(PlayerRatingEntity::gamesPlayed).orElse(0);
+    public int ratingOf(long userId, String gameType) {
+        return row(userId, gameType).map(Row::rating).orElse(config.initialRating());
+    }
+
+    private int gamesOf(long userId, String gameType) {
+        return row(userId, gameType).map(Row::gamesPlayed).orElse(0);
+    }
+
+    private Optional<Row> row(long userId, String gameType) {
+        return RAMI.equalsIgnoreCase(gameType)
+                ? ramiRatings.findById(userId).map(r -> new Row(r.userId(), r.rating(), r.gamesPlayed()))
+                : ratings.findById(userId).map(r -> new Row(r.userId(), r.rating(), r.gamesPlayed()));
+    }
+
+    @Transactional
+    public List<RatingUpdate> applyRankedResult(List<SeatRating> seats) {
+        return applyRankedResult("BARBU", seats);
     }
 
     /**
@@ -51,11 +78,12 @@ public class RatingService {
      * movements. Transactional: all or nothing.
      */
     @Transactional
-    public List<RatingUpdate> applyRankedResult(List<SeatRating> seats) {
+    public List<RatingUpdate> applyRankedResult(String gameType, List<SeatRating> seats) {
         List<Participant> participants = new ArrayList<>(seats.size());
         for (SeatRating s : seats) {
-            int rating = (s.isBot() || s.userId() == null) ? config.botRating() : ratingOf(s.userId());
-            int games = (s.isBot() || s.userId() == null) ? config.provisionalGames() : gamesOf(s.userId());
+            boolean unrated = s.isBot() || s.userId() == null;
+            int rating = unrated ? config.botRating() : ratingOf(s.userId(), gameType);
+            int games = unrated ? config.provisionalGames() : gamesOf(s.userId(), gameType);
             participants.add(new Participant(rating, games, s.placement()));
         }
         List<EloCalculator.Delta> deltas = calculator.compute(participants);
@@ -70,17 +98,28 @@ public class RatingService {
             int before = participants.get(i).rating();
             int delta = deltas.get(i).ratingDelta();
             int after = before + delta;
-            upsert(s.userId(), after, gamesOf(s.userId()) + 1, now);
+            upsert(gameType, s.userId(), after, gamesOf(s.userId(), gameType) + 1, now);
             updates.add(new RatingUpdate(s.seat(), before, after, delta));
         }
         return updates;
     }
 
     public List<LeaderboardRow> topPlayers(int limit) {
-        List<PlayerRatingEntity> rows = ratings.findAllOrderByRatingDesc(Pageable.from(0, limit));
+        return topPlayers("BARBU", limit);
+    }
+
+    public List<LeaderboardRow> topPlayers(String gameType, int limit) {
+        Pageable page = Pageable.from(0, limit);
+        List<Row> rows = RAMI.equalsIgnoreCase(gameType)
+                ? ramiRatings.findAllOrderByRatingDesc(page).stream()
+                        .map(r -> new Row(r.userId(), r.rating(), r.gamesPlayed()))
+                        .toList()
+                : ratings.findAllOrderByRatingDesc(page).stream()
+                        .map(r -> new Row(r.userId(), r.rating(), r.gamesPlayed()))
+                        .toList();
         List<LeaderboardRow> out = new ArrayList<>(rows.size());
         for (int i = 0; i < rows.size(); i++) {
-            PlayerRatingEntity r = rows.get(i);
+            Row r = rows.get(i);
             Optional<UserEntity> user = users.findById(r.userId());
             out.add(new LeaderboardRow(i + 1, user.map(UserEntity::username).orElse("?"), r.rating(), r.gamesPlayed()));
         }
@@ -88,7 +127,16 @@ public class RatingService {
     }
 
     /** Portable H2/Postgres upsert (no {@code ON CONFLICT}): existence check then update or save. */
-    private void upsert(long userId, int rating, int gamesPlayed, Instant now) {
+    private void upsert(String gameType, long userId, int rating, int gamesPlayed, Instant now) {
+        if (RAMI.equalsIgnoreCase(gameType)) {
+            RamiRatingEntity entity = new RamiRatingEntity(userId, rating, gamesPlayed, now);
+            if (ramiRatings.existsById(userId)) {
+                ramiRatings.update(entity);
+            } else {
+                ramiRatings.save(entity);
+            }
+            return;
+        }
         PlayerRatingEntity entity = new PlayerRatingEntity(userId, rating, gamesPlayed, now);
         if (ratings.existsById(userId)) {
             ratings.update(entity);
