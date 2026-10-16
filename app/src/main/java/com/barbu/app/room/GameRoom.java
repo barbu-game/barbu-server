@@ -40,6 +40,9 @@ public final class GameRoom {
     private final long botDelayMs;
     private final MatchRecorder recorder;
     private final com.barbu.app.metrics.GameMetrics metrics;
+    /** Private table whose players opted out of the turn timer; the mode is what persists it. */
+    public static final String UNTIMED = "untimed";
+
     private final String mode;
     private final RatingService ratingService;
 
@@ -837,7 +840,7 @@ public final class GameRoom {
     }
 
     private void armTurnTimer() {
-        if (stopped || voteOpen || stepPending) {
+        if (stopped || voteOpen || stepPending || UNTIMED.equals(mode)) {
             return;
         }
         OptionalInt actor = game.currentActor();

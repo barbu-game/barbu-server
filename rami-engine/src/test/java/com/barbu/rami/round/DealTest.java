@@ -18,8 +18,8 @@ class DealTest {
         for (int seat = 0; seat < 5; seat++) {
             assertEquals(seat == 3 ? 14 : 13, r.hand(seat).size());
         }
-        assertEquals(1, r.discard().size());
-        assertEquals(RamiDeck.SIZE - 66 - 1, r.stock().size());
+        assertTrue(r.discard().isEmpty());
+        assertEquals(RamiDeck.SIZE - 66, r.stock().size());
         assertEquals(List.of(false, false, false, false, false), r.opened());
         assertTrue(r.mustPlay().isEmpty());
         assertNotNull(r.turnStart());

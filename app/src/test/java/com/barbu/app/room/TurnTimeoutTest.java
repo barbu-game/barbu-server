@@ -19,6 +19,10 @@ class TurnTimeoutTest {
     }
 
     private static GameRoom room(ScheduledExecutorService scheduler, long timeoutMs, int strikes) {
+        return room(scheduler, timeoutMs, strikes, "private");
+    }
+
+    private static GameRoom room(ScheduledExecutorService scheduler, long timeoutMs, int strikes, String mode) {
         return new GameRoom(
                 "T",
                 3,
@@ -28,7 +32,7 @@ class TurnTimeoutTest {
                 0,
                 null,
                 null,
-                "private",
+                mode,
                 null,
                 null,
                 timeoutMs,
@@ -83,6 +87,31 @@ class TurnTimeoutTest {
             assertTrue(
                     epoch instanceof Long && (Long) epoch > System.currentTimeMillis(),
                     "the active human's seat must carry a future turnDeadlineEpochMs");
+        } finally {
+            scheduler.shutdownNow();
+        }
+    }
+
+    @Test
+    void an_untimed_table_never_times_a_human_out() throws InterruptedException {
+        ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
+        try {
+            GameRoom room = room(scheduler, 20, 1, GameRoom.UNTIMED);
+            room.addHuman(new FakeSession(), "Alice", 1L);
+            room.addBot();
+            room.addBot();
+            room.start(42L);
+
+            long deadline = System.currentTimeMillis() + 1000;
+            while (!Integer.valueOf(0).equals(room.viewFor(0).currentActor())
+                    && System.currentTimeMillis() < deadline) {
+                Thread.sleep(20);
+            }
+            Thread.sleep(200);
+            GameStateMessage view = room.viewFor(0);
+            assertEquals(0, view.currentActor());
+            assertEquals(null, view.turnDeadlineEpochMs());
+            assertFalse(player(room, 0).bot());
         } finally {
             scheduler.shutdownNow();
         }
