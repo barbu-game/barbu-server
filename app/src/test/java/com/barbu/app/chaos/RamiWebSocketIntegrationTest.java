@@ -39,15 +39,20 @@ class RamiWebSocketIntegrationTest {
             }
             host.sendJson(Map.of("type", "start"));
 
-            JsonNode myTurn = host.await(m -> isState(m)
-                    && m.path("currentActor").asInt(-1) == 0
-                    && m.path("rami").path("turnPhase").asText().equals("DRAW"));
-            int handSize = myTurn.path("rami").path("yourHand").size();
-
-            host.sendJson(Map.of("type", "play", "move", Map.of("kind", "draw", "source", "STOCK")));
-            host.await(m -> isState(m)
-                    && m.path("rami").path("turnPhase").asText().equals("PLAY")
-                    && m.path("rami").path("yourHand").size() == handSize + 1);
+            // Bots may end a round before our first turn, and the round's first player starts without
+            // drawing: take our turn in whichever phase it comes.
+            JsonNode myTurn = host.await(
+                    m -> isState(m)
+                            && m.path("currentActor").asInt(-1) == 0
+                            && !m.path("rami").path("turnPhase").asText().isEmpty(),
+                    30_000);
+            if (myTurn.path("rami").path("turnPhase").asText().equals("DRAW")) {
+                int handSize = myTurn.path("rami").path("yourHand").size();
+                host.sendJson(Map.of("type", "play", "move", Map.of("kind", "draw", "source", "STOCK")));
+                host.await(m -> isState(m)
+                        && m.path("rami").path("turnPhase").asText().equals("PLAY")
+                        && m.path("rami").path("yourHand").size() == handSize + 1);
+            }
 
             host.sendJson(Map.of("type", "play", "move", Map.of("kind", "discard", "cardId", 999)));
             JsonNode error = host.await(m -> m.path("type").asText().equals("error"));

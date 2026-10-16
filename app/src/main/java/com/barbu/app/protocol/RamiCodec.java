@@ -40,7 +40,7 @@ public final class RamiCodec {
         if (round == null) {
             RoundSummary last = match.lastRound();
             RoundRecap recap = last == null ? null : new RoundRecap(last.winner(), last.ramiSec(), last.penalties());
-            return new RamiView(null, null, null, null, null, null, null, null, recap);
+            return new RamiView(null, null, null, null, null, null, null, recap);
         }
         boolean active = round.current() == seat;
         return new RamiView(
@@ -59,7 +59,6 @@ public final class RamiCodec {
                         .toList(),
                 round.opened(),
                 active ? round.mustPlay().stream().sorted().toList() : List.of(),
-                active && round.stockOnly(),
                 null);
     }
 

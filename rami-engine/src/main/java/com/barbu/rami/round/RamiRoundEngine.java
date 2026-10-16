@@ -57,7 +57,7 @@ public final class RamiRoundEngine {
             List<Boolean> opened) {
         int nextMeldId = melds.stream().mapToInt(Meld::id).max().orElse(-1) + 1;
         Table t = new Table(new RamiRound(
-                hands, stock, discard, melds, opened, current, phase, Set.of(), false, null, nextMeldId, null, 0));
+                hands, stock, discard, melds, opened, current, phase, Set.of(), null, nextMeldId, null, 0));
         t.snapshotTurnStart();
         return t.freeze();
     }
@@ -92,9 +92,6 @@ public final class RamiRoundEngine {
         requirePhase(t, Phase.DRAW);
         RamiCard card;
         if (source == RamiMove.Source.DISCARD) {
-            if (t.stockOnly) {
-                throw iae("the discard pile is closed for this turn");
-            }
             if (t.hand().size() <= 2) {
                 throw iae("cannot take the discard with two cards or fewer");
             }
@@ -102,10 +99,6 @@ public final class RamiRoundEngine {
                 throw iae("the discard pile is empty");
             }
             card = t.discard.remove(t.discard.size() - 1);
-            t.mustPlay.add(card.id());
-            Table start = new Table(t.turnStart);
-            start.stockOnly = true;
-            t.turnStart = start.freeze();
         } else {
             if (t.stock.isEmpty() && t.recycles < MAX_RECYCLES) {
                 recycle(t);
@@ -118,10 +111,8 @@ public final class RamiRoundEngine {
         }
         t.hand().add(card);
         t.phase = Phase.PLAY;
-        // The drawn card has been seen: a reset must not put it back for a second choice.
-        if (source == RamiMove.Source.STOCK) {
-            t.snapshotTurnStart();
-        }
+        // Drawing commits: a reset undoes plays, never the draw (a stock card has been seen).
+        t.snapshotTurnStart();
     }
 
     // Turning the pile over puts its bottom card on top of the new stock.
@@ -151,7 +142,6 @@ public final class RamiRoundEngine {
         }
         t.current = (t.current + 1) % t.hands.size();
         t.phase = Phase.DRAW;
-        t.stockOnly = false;
         t.snapshotTurnStart();
     }
 
@@ -310,7 +300,6 @@ public final class RamiRoundEngine {
         int current;
         Phase phase;
         final Set<Integer> mustPlay;
-        boolean stockOnly;
         RamiRound turnStart;
         int nextMeldId;
         Integer winner;
@@ -325,7 +314,6 @@ public final class RamiRoundEngine {
             current = r.current();
             phase = r.phase();
             mustPlay = new HashSet<>(r.mustPlay());
-            stockOnly = r.stockOnly();
             turnStart = r.turnStart();
             nextMeldId = r.nextMeldId();
             winner = r.winner();
@@ -346,7 +334,6 @@ public final class RamiRoundEngine {
                     current,
                     phase,
                     Set.copyOf(mustPlay),
-                    stockOnly,
                     turnStart,
                     nextMeldId,
                     winner,

@@ -3,7 +3,6 @@ package com.barbu.app.room;
 import static org.junit.jupiter.api.Assertions.*;
 
 import com.barbu.app.protocol.GameStateMessage;
-import com.barbu.rami.round.Phase;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import java.util.Map;
@@ -81,9 +80,9 @@ class RamiRoomTest {
         room.play(0, Map.of("kind", "draw", "source", "DISCARD"));
         GameStateMessage afterDraw = room.viewFor(0);
         assertEquals("PLAY", afterDraw.rami().turnPhase());
-        int taken = afterDraw.rami().mustPlay().get(0);
+        assertEquals(List.of(), afterDraw.rami().mustPlay(), "a taken discard may stay in hand");
 
-        assertThrows(IllegalArgumentException.class, () -> room.play(0, Map.of("kind", "discard", "cardId", taken)));
+        assertThrows(IllegalArgumentException.class, () -> room.play(0, Map.of("kind", "discard", "cardId", 999)));
         assertThrows(IllegalArgumentException.class, () -> room.play(0, Map.of("kind", "discard", "cardId", "x")));
         assertEquals(0, room.viewFor(0).currentActor());
         assertNotNull(room.viewFor(0).turnDeadlineEpochMs(), "the turn timer survives a rejected move");
@@ -120,15 +119,5 @@ class RamiRoomTest {
         // The single pending task is the original timer: when it fires, the turn passes.
         assertTrue(scheduler.step());
         assertNotEquals(0, room.viewFor(0).currentActor());
-    }
-
-    @Test
-    void opponents_never_see_the_active_seats_must_play() {
-        InlineScheduler scheduler = new InlineScheduler();
-        GameRoom room = untilHumanTurn(scheduler, new FakeSession());
-        room.play(0, Map.of("kind", "draw", "source", "DISCARD"));
-        assertEquals(1, room.viewFor(0).rami().mustPlay().size());
-        assertEquals(List.of(), room.viewFor(1).rami().mustPlay());
-        assertEquals(Phase.PLAY.name(), room.viewFor(1).rami().turnPhase());
     }
 }

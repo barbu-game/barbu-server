@@ -5,8 +5,8 @@ import io.micronaut.core.annotation.Nullable;
 import java.util.List;
 
 /**
- * The Rami part of a seat's state: only that seat's hand; the stock is a count. {@code mustPlay} and
- * {@code discardClosed} describe the active seat's turn and stay empty/false for everyone else.
+ * The Rami part of a seat's state: only that seat's hand; the stock is a count. {@code mustPlay} (a
+ * reclaimed joker to replay) is the active seat's and stays empty for everyone else.
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record RamiView(
@@ -17,7 +17,6 @@ public record RamiView(
         @Nullable List<MeldView> melds,
         @Nullable List<Boolean> opened,
         @Nullable List<Integer> mustPlay,
-        @Nullable Boolean discardClosed,
         @Nullable RoundRecap lastRound) {
 
     @JsonInclude(JsonInclude.Include.NON_NULL)

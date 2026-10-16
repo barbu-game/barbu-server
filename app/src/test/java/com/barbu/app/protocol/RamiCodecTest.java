@@ -74,13 +74,11 @@ class RamiCodecTest {
         assertEquals(14, mine.yourHand().size());
         assertEquals(m.round().stock().size(), mine.stockCount());
         assertEquals(List.of(), mine.mustPlay());
-        assertFalse(mine.discardClosed());
         assertNull(mine.lastRound());
 
         RamiView theirs = RamiCodec.view(m, other);
         assertEquals(13, theirs.yourHand().size());
         assertEquals(List.of(), theirs.mustPlay());
-        assertFalse(theirs.discardClosed());
 
         JsonNode json = new ObjectMapper().readTree(new ObjectMapper().writeValueAsString(theirs));
         assertFalse(json.has("stock"));
@@ -111,5 +109,28 @@ class RamiCodecTest {
         assertNull(v.turnPhase());
         assertNull(v.yourHand());
         assertEquals(new RamiView.RoundRecap(0, true, List.of(0, 35, 18, 2)), v.lastRound());
+    }
+
+    @Test
+    void only_the_active_seat_sees_its_pending_joker() {
+        RamiMatch m = RamiMatchEngine.startNextRound(RamiMatchEngine.newMatch(4, 3L));
+        com.barbu.rami.round.RamiRound r = m.round();
+        com.barbu.rami.round.RamiRound pending = new com.barbu.rami.round.RamiRound(
+                r.hands(),
+                r.stock(),
+                r.discard(),
+                r.melds(),
+                r.opened(),
+                r.current(),
+                r.phase(),
+                java.util.Set.of(r.hand(r.current()).get(0).id()),
+                r.turnStart(),
+                r.nextMeldId(),
+                null,
+                0);
+        RamiMatch withPending = new RamiMatch(4, 4, 3L, 1, m.totals(), pending, null);
+        assertEquals(1, RamiCodec.view(withPending, r.current()).mustPlay().size());
+        assertEquals(
+                List.of(), RamiCodec.view(withPending, (r.current() + 1) % 4).mustPlay());
     }
 }

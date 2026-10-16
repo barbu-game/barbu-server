@@ -101,7 +101,7 @@ public final class RamiBot {
     }
 
     private static boolean discardFits(RamiRound round, List<RamiCard> hand) {
-        if (round.stockOnly() || hand.size() <= 2 || round.discard().isEmpty()) {
+        if (hand.size() <= 2 || round.discard().isEmpty()) {
             return false;
         }
         RamiCard top = round.discard().get(round.discard().size() - 1);
@@ -109,7 +109,7 @@ public final class RamiBot {
     }
 
     private static boolean discardOpens(RamiRound round, List<RamiCard> hand) {
-        if (round.stockOnly() || hand.size() <= 2 || round.discard().isEmpty()) {
+        if (hand.size() <= 2 || round.discard().isEmpty()) {
             return false;
         }
         RamiCard top = round.discard().get(round.discard().size() - 1);
