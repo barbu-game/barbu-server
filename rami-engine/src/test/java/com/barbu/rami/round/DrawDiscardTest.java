@@ -37,13 +37,16 @@ class DrawDiscardTest {
     }
 
     @Test
-    void taken_discard_must_be_played_before_discarding() {
+    void a_taken_discard_may_stay_in_hand() {
         RamiCard top = c("KD");
-        RamiRound r = RamiRoundEngine.apply(
-                seat0(Phase.DRAW, cs("5S", "6S", "7S"), cs("9H"), List.of(top)), 0, new Draw(Source.DISCARD));
-        assertEquals(java.util.Set.of(top.id()), r.mustPlay());
-        RamiRound after = r;
-        assertThrows(IllegalArgumentException.class, () -> RamiRoundEngine.apply(after, 0, new Discard(top.id())));
+        List<RamiCard> hand = cs("5S", "6S", "7S");
+        RamiRound r =
+                RamiRoundEngine.apply(seat0(Phase.DRAW, hand, cs("9H"), List.of(top)), 0, new Draw(Source.DISCARD));
+        assertTrue(r.mustPlay().isEmpty());
+        assertTrue(r.hand(0).contains(top));
+        RamiRound after = RamiRoundEngine.apply(r, 0, new Discard(hand.get(0).id()));
+        assertEquals(1, after.current());
+        assertTrue(after.hand(0).contains(top));
     }
 
     @Test
@@ -92,7 +95,6 @@ class DrawDiscardTest {
                 0,
                 Phase.DRAW,
                 java.util.Set.of(),
-                false,
                 fresh.turnStart(),
                 0,
                 null,
@@ -133,19 +135,14 @@ class DrawDiscardTest {
     }
 
     @Test
-    void reset_after_taking_the_discard_restores_the_turn_and_closes_the_discard() {
+    void reset_after_taking_the_discard_keeps_the_taken_card() {
         RamiCard top = c("KD");
-        RamiRound start = seat0(Phase.DRAW, cs("5S", "6S", "7S"), cs("9H"), List.of(top));
-        RamiRound taken = RamiRoundEngine.apply(start, 0, new Draw(Source.DISCARD));
+        RamiRound taken = RamiRoundEngine.apply(
+                seat0(Phase.DRAW, cs("5S", "6S", "7S"), cs("9H"), List.of(top)), 0, new Draw(Source.DISCARD));
         RamiRound reset = RamiRoundEngine.apply(taken, 0, new ResetTurn());
-        assertEquals(Phase.DRAW, reset.phase());
-        assertEquals(start.hand(0), reset.hand(0));
-        assertEquals(List.of(top), reset.discard());
-        assertTrue(reset.stockOnly());
-        assertThrows(IllegalArgumentException.class, () -> RamiRoundEngine.apply(reset, 0, new Draw(Source.DISCARD)));
-        assertEquals(
-                Phase.PLAY,
-                RamiRoundEngine.apply(reset, 0, new Draw(Source.STOCK)).phase());
+        assertEquals(Phase.PLAY, reset.phase());
+        assertTrue(reset.hand(0).contains(top));
+        assertEquals(List.of(), reset.discard());
     }
 
     @Test

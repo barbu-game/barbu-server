@@ -38,7 +38,11 @@ public class TestGameClient implements AutoCloseable {
 
     /** Waits (≤10s) for a message satisfying the predicate and returns it. */
     JsonNode await(Predicate<JsonNode> match) throws InterruptedException {
-        for (int i = 0; i < 200; i++) {
+        return await(match, 10_000);
+    }
+
+    JsonNode await(Predicate<JsonNode> match, long timeoutMs) throws InterruptedException {
+        for (long i = 0; i < timeoutMs / 50; i++) {
             for (JsonNode m : messages) {
                 if (match.test(m)) {
                     return m;

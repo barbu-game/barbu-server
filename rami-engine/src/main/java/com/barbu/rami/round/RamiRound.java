@@ -6,8 +6,8 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Stock is drawn from index 0; the discard top is its last element. {@code mustPlay} holds the
- * taken discard card and any reclaimed joker, which must reach the table before discarding.
+ * Stock is drawn from index 0; the discard top is its last element. {@code mustPlay} holds a
+ * reclaimed joker, which must reach the table before discarding.
  */
 public record RamiRound(
         List<List<RamiCard>> hands,
@@ -18,7 +18,6 @@ public record RamiRound(
         int current,
         Phase phase,
         Set<Integer> mustPlay,
-        boolean stockOnly,
         RamiRound turnStart,
         int nextMeldId,
         Integer winner,
