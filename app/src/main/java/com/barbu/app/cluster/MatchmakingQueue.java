@@ -17,7 +17,25 @@ public interface MatchmakingQueue {
             Integer rating,
             int desiredSize,
             String homePod,
-            long enqueuedAt) {}
+            long enqueuedAt,
+            String gameType) {
+
+        public Entry {
+            // Entries written by a server that predates the Rami carry no game type.
+            gameType = gameType == null ? "BARBU" : gameType;
+        }
+
+        public Entry(
+                String entryId,
+                Long userId,
+                String name,
+                Integer rating,
+                int desiredSize,
+                String homePod,
+                long enqueuedAt) {
+            this(entryId, userId, name, rating, desiredSize, homePod, enqueuedAt, "BARBU");
+        }
+    }
 
     record Assignment(String roomId, String resumeToken, String ownerPod) {}
 

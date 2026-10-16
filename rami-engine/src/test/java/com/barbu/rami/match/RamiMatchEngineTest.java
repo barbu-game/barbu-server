@@ -104,4 +104,20 @@ class RamiMatchEngineTest {
         RamiMatch m = RamiMatchEngine.newMatch(4, 1);
         assertThrows(IllegalStateException.class, () -> RamiMatchEngine.apply(m, 0, new Discard(0)));
     }
+
+    @Test
+    void every_settled_round_is_kept_in_the_history() {
+        RamiCard last = c("5S");
+        RamiMatch m = RamiMatchEngine.apply(
+                inRound(seat0Plays(List.of(last), true), List.of(0, 0, 0, 0)), 0, new Discard(last.id()));
+        assertEquals(List.of(new RoundSummary(0, false, List.of(0, 35, 18, 2))), m.history());
+        RamiMatch next = RamiMatchEngine.startNextRound(m);
+        assertEquals(m.history(), next.history());
+    }
+
+    @Test
+    void a_match_built_without_history_starts_empty() {
+        assertEquals(List.of(), new RamiMatch(4, 4, 1L, 0, List.of(0, 0, 0, 0), null, null).history());
+        assertEquals(List.of(), RamiMatchEngine.newMatch(4, 1L).history());
+    }
 }

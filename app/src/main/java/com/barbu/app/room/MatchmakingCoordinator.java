@@ -7,16 +7,19 @@ import com.barbu.app.cluster.RoomRegistry;
 import com.barbu.app.rating.EloConfig;
 import com.barbu.app.rating.RatingService;
 import com.barbu.engine.variant.Variants;
+import com.barbu.rami.round.RamiRoundEngine;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micronaut.context.annotation.Context;
 import io.micronaut.context.annotation.Value;
 import io.micronaut.websocket.WebSocketSession;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
@@ -36,6 +39,7 @@ import java.util.concurrent.TimeUnit;
 public class MatchmakingCoordinator {
 
     private static final String LEADER_KEY = "barbu:mm:leader";
+    private static final String RAMI = "RAMI";
 
     private final MatchmakingQueue queue;
     private final RoomManager rooms;
@@ -88,15 +92,26 @@ public class MatchmakingCoordinator {
     }
 
     public synchronized void enqueueCasual(WebSocketSession session, String name, int desiredSize) {
-        int size = Math.clamp(desiredSize, 2, 10);
+        enqueueCasual(session, name, desiredSize, "BARBU");
+    }
+
+    public synchronized void enqueueCasual(WebSocketSession session, String name, int desiredSize, String gameType) {
+        int size = RAMI.equals(gameType)
+                ? Math.clamp(desiredSize, RamiRoundEngine.MIN_PLAYERS, RamiRoundEngine.MAX_PLAYERS)
+                : Math.clamp(desiredSize, 2, 10);
         if (alreadyLocallyQueued(session)) {
             return;
         }
         Long userId = session.get("userId", Long.class).orElse(null);
-        register(session, new Entry(newEntryId(session), userId, name, null, size, podId, now()));
+        register(session, new Entry(newEntryId(session), userId, name, null, size, podId, now(), gameOf(gameType)));
     }
 
     public synchronized void enqueueRanked(WebSocketSession session, String name) {
+        enqueueRanked(session, name, "BARBU");
+    }
+
+    public synchronized void enqueueRanked(WebSocketSession session, String name, String gameType) {
+        String game = gameOf(gameType);
         Long userId = session.get("userId", Long.class).orElse(null);
         if (userId == null) {
             return; // ranked requires an account; the WS already returned the error
@@ -104,14 +119,23 @@ public class MatchmakingCoordinator {
         if (alreadyLocallyQueued(session)) {
             return;
         }
-        // Idempotent per account cluster-wide: a second tab/pod does not create a 2nd seat.
+        // One ranked seat per account cluster-wide, whatever the game: a second tab/pod gets none.
         for (Entry e : queue.ranked()) {
             if (userId.equals(e.userId())) {
                 return;
             }
         }
         register(
-                session, new Entry(newEntryId(session), userId, name, ratingService.ratingOf(userId), 0, podId, now()));
+                session,
+                new Entry(
+                        newEntryId(session),
+                        userId,
+                        name,
+                        ratingService.ratingOf(userId, game),
+                        0,
+                        podId,
+                        now(),
+                        game));
     }
 
     public synchronized void cancel(WebSocketSession session) {
@@ -179,37 +203,53 @@ public class MatchmakingCoordinator {
 
     private void decideCasual() {
         for (int size = 2; size <= 10; size++) {
-            List<Entry> waiting = queue.casual(size);
-            if (waiting.isEmpty()) {
-                continue;
+            for (Map.Entry<String, List<Entry>> game :
+                    byGame(queue.casual(size)).entrySet()) {
+                List<Entry> waiting = game.getValue();
+                final int seats = size;
+                List<CasualMatchmaker.Candidate> candidates = waiting.stream()
+                        .map(e -> new CasualMatchmaker.Candidate(e.enqueuedAt()))
+                        .toList();
+                CasualMatchmaker.decideFormation(candidates, now(), fillTimeoutMs, seats)
+                        .ifPresent(f -> form(seats, "casual", game.getKey(), waiting, f.indices(), f.botsToAdd()));
             }
-            final int seats = size;
-            List<CasualMatchmaker.Candidate> candidates = waiting.stream()
-                    .map(e -> new CasualMatchmaker.Candidate(e.enqueuedAt()))
-                    .toList();
-            CasualMatchmaker.decideFormation(candidates, now(), fillTimeoutMs, seats)
-                    .ifPresent(f -> form(seats, "casual", waiting, f.indices(), f.botsToAdd()));
         }
     }
 
     private void decideRanked() {
-        List<Entry> waiting = queue.ranked();
-        if (waiting.isEmpty()) {
-            return;
+        for (Map.Entry<String, List<Entry>> game : byGame(queue.ranked()).entrySet()) {
+            List<Entry> waiting = game.getValue();
+            int seats = RAMI.equals(game.getKey())
+                    ? Math.clamp(eloConfig.rankedTableSize(), RamiRoundEngine.MIN_PLAYERS, RamiRoundEngine.MAX_PLAYERS)
+                    : eloConfig.rankedTableSize();
+            List<RankedMatchmaker.Candidate> candidates = waiting.stream()
+                    .map(e -> new RankedMatchmaker.Candidate(e.rating(), e.enqueuedAt()))
+                    .toList();
+            RankedMatchmaker.decideFormation(candidates, now(), eloConfig, seats)
+                    .ifPresent(f -> form(seats, "ranked", game.getKey(), waiting, f.indices(), f.botsToAdd()));
         }
-        List<RankedMatchmaker.Candidate> candidates = waiting.stream()
-                .map(e -> new RankedMatchmaker.Candidate(e.rating(), e.enqueuedAt()))
-                .toList();
-        RankedMatchmaker.decideFormation(candidates, now(), eloConfig)
-                .ifPresent(f -> form(eloConfig.rankedTableSize(), "ranked", waiting, f.indices(), f.botsToAdd()));
     }
 
-    private void form(int size, String mode, List<Entry> waiting, List<Integer> indices, int botsToAdd) {
+    private static Map<String, List<Entry>> byGame(List<Entry> entries) {
+        Map<String, List<Entry>> groups = new TreeMap<>();
+        for (Entry e : entries) {
+            groups.computeIfAbsent(e.gameType(), k -> new ArrayList<>()).add(e);
+        }
+        return groups;
+    }
+
+    private static String gameOf(String gameType) {
+        return RAMI.equals(gameType) ? RAMI : "BARBU";
+    }
+
+    private void form(
+            int size, String mode, String gameType, List<Entry> waiting, List<Integer> indices, int botsToAdd) {
         List<Entry> seated = indices.stream().map(waiting::get).toList();
         for (Entry e : seated) {
             queue.remove(e.entryId()); // remove from the queue before seating: no double-match
         }
-        GameRoom room = rooms.create(size, Variants.DEVELOPER, mode);
+        GameRoom room =
+                RAMI.equals(gameType) ? rooms.createRami(size, mode) : rooms.create(size, Variants.DEVELOPER, mode);
         for (Entry e : seated) {
             String token = room.reserveHuman(e.name(), e.userId());
             queue.assign(e.entryId(), new Assignment(room.id(), token, podId), assignTtlMs);

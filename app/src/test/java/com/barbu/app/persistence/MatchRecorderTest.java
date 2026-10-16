@@ -81,7 +81,13 @@ class MatchRecorderTest {
         assertEquals("RAMI", game.gameType());
         assertEquals("rami51", game.variant());
         assertEquals(4, count(gamePlayers.findByGameId(gameId)));
-        assertEquals(0, count(rounds.findByGameId(gameId)));
+        var recorded = StreamSupport.stream(rounds.findByGameId(gameId).spliterator(), false)
+                .toList();
+        assertEquals(4, recorded.size(), "one row per round");
+        assertTrue(recorded.stream().allMatch(r -> r.contract().equals("RAMI")));
+        assertEquals(
+                List.of(0, 1, 2, 3),
+                recorded.stream().map(r -> r.dealerSeat()).sorted().toList());
         int winner = com.barbu.rami.match.RamiMatchEngine.standings(rami).get(0);
         var first = StreamSupport.stream(gamePlayers.findByGameId(gameId).spliterator(), false)
                 .filter(p -> p.finalRank() == 1)

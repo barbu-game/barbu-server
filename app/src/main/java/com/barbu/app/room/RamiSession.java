@@ -6,6 +6,7 @@ import com.barbu.app.protocol.GameStateMessage.PauseVoteState;
 import com.barbu.app.protocol.GameStateMessage.PausedState;
 import com.barbu.app.protocol.GameStateMessage.Standing;
 import com.barbu.app.protocol.GameStateMessage.VariantInfo;
+import com.barbu.app.protocol.GameStateMessage.VoteState;
 import com.barbu.app.protocol.RamiCodec;
 import com.barbu.app.protocol.RamiView;
 import com.barbu.bot.rami.RamiBot;
@@ -112,9 +113,10 @@ final class RamiSession implements GameSession {
         match = RamiMatchEngine.startNextRound(match);
     }
 
+    // A dealer cycle is the whole Rami match, so the vote comes after every round but the last.
     @Override
     public boolean atStopVoteBoundary() {
-        return false;
+        return betweenRounds() && match.roundNumber() > 0;
     }
 
     @Override
@@ -158,6 +160,7 @@ final class RamiSession implements GameSession {
         Integer plannedRounds = null;
         List<Integer> totals = null;
         List<Standing> standings = null;
+        VoteState stopVote = null;
         PauseVoteState pauseVote = null;
         PausedState paused = null;
         Integer currentActor = null;
@@ -174,6 +177,7 @@ final class RamiSession implements GameSession {
             if (ctx.finished()) {
                 standings = standings(ctx.names());
             } else {
+                stopVote = ctx.stopVote();
                 pauseVote = ctx.pauseVote();
                 paused = ctx.paused();
                 RamiRound round = match.round();
@@ -199,7 +203,7 @@ final class RamiSession implements GameSession {
                 plannedRounds,
                 totals,
                 standings,
-                null,
+                stopVote,
                 pauseVote,
                 paused,
                 currentActor,

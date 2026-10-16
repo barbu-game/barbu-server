@@ -13,6 +13,7 @@ import com.barbu.engine.match.MatchState;
 import com.barbu.engine.round.RoundResult;
 import com.barbu.rami.match.RamiMatch;
 import com.barbu.rami.match.RamiMatchEngine;
+import com.barbu.rami.match.RoundSummary;
 import jakarta.inject.Singleton;
 import jakarta.transaction.Transactional;
 import java.time.Instant;
@@ -77,7 +78,7 @@ public class MatchRecorder {
         return gameId;
     }
 
-    /** Game and final ranking only; per-round Rami scores are not kept in v1. */
+    /** Game, final ranking, and each round's penalties (contract {@code RAMI}). */
     @Transactional
     public long recordRami(String mode, RamiMatch match, List<PlayerInfo> players) {
         GameEntity game = games.save(new GameEntity(
@@ -93,6 +94,14 @@ public class MatchRecorder {
                     p.isBot(),
                     standings.indexOf(p.seat()) + 1,
                     match.totals().get(p.seat())));
+        }
+        List<RoundSummary> history = match.history();
+        for (int i = 0; i < history.size(); i++) {
+            RoundEntity round = rounds.save(new RoundEntity(null, game.id(), i + 1, i % match.playerCount(), "RAMI"));
+            List<Integer> penalties = history.get(i).penalties();
+            for (int seat = 0; seat < penalties.size(); seat++) {
+                roundScores.save(new RoundScoreEntity(null, round.id(), seat, penalties.get(seat)));
+            }
         }
         return game.id();
     }

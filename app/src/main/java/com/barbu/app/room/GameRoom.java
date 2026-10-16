@@ -958,7 +958,7 @@ public final class GameRoom {
 
         if (ratingService != null && "ranked".equals(mode) && game.isComplete()) {
             try {
-                broadcastRankedResult(ratingService.applyRankedResult(eloSeats()));
+                broadcastRankedResult(ratingService.applyRankedResult(game.gameType(), eloSeats()));
             } catch (Exception e) {
                 // ELO is best-effort: a failure must not interrupt the end of the game
                 LOG.warn("ranked ELO update failed for room {} (best-effort, game unaffected)", id, e);
@@ -1017,7 +1017,7 @@ public final class GameRoom {
         }
         recorded = true;
         try {
-            broadcastRankedResult(ratingService.applyRankedResult(eloSeats()));
+            broadcastRankedResult(ratingService.applyRankedResult(game.gameType(), eloSeats()));
         } catch (Exception e) {
             // best-effort: a recording failure must not block the room from closing
             LOG.warn("forfeit ELO update failed for room {} (best-effort, room still closes)", id, e);
