@@ -84,7 +84,9 @@ public class GameWebSocket {
                 authenticate(session, asString(command.get("token")));
                 GameRoom room;
                 if ("RAMI".equals(asString(command.get("gameType")))) {
-                    room = rooms.createRami(asInt(command.get("playerCount"), RamiRoundEngine.MAX_PLAYERS));
+                    room = rooms.createRami(
+                            asInt(command.get("playerCount"), RamiRoundEngine.MAX_PLAYERS),
+                            Boolean.FALSE.equals(command.get("timer")) ? GameRoom.UNTIMED : "private");
                 } else {
                     String variantId = asString(command.get("variant"));
                     Variant variant = variantId == null ? Variants.DEVELOPER : Variants.byId(variantId);

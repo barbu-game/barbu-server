@@ -40,8 +40,8 @@ public final class RamiRoundEngine {
                 first,
                 Phase.PLAY,
                 hands,
-                deck.subList(pos + 1, deck.size()),
-                List.of(deck.get(pos)),
+                deck.subList(pos, deck.size()),
+                List.of(),
                 List.of(),
                 Collections.nCopies(playerCount, false));
     }
@@ -92,8 +92,8 @@ public final class RamiRoundEngine {
         requirePhase(t, Phase.DRAW);
         RamiCard card;
         if (source == RamiMove.Source.DISCARD) {
-            if (t.hand().size() <= 2) {
-                throw iae("cannot take the discard with two cards or fewer");
+            if (t.hand().size() <= 1) {
+                throw iae("cannot take the discard with a single card");
             }
             if (t.discard.isEmpty()) {
                 throw iae("the discard pile is empty");
@@ -189,12 +189,16 @@ public final class RamiRoundEngine {
         List<RamiCard> all = resolve(t, groups.stream().flatMap(List::stream).toList());
         List<List<RamiCard>> melds = groups.stream().map(g -> resolve(t, g)).toList();
         int total = 0;
+        boolean hasRun = false;
         for (List<RamiCard> meld : melds) {
-            requireMeld(meld);
+            hasRun |= requireMeld(meld) == MeldKind.RUN;
             total += MeldRules.points(meld);
         }
         if (total < OPENING_MIN) {
             throw iae("opening is worth " + total + ", needs " + OPENING_MIN);
+        }
+        if (!hasRun) {
+            throw iae("opening needs at least one run");
         }
         removeFromHand(t, all);
         melds.forEach(meld -> addMeld(t, meld));
@@ -246,6 +250,10 @@ public final class RamiRoundEngine {
         }
         if (jokerAt < 0) {
             throw iae("meld " + meld.id() + " has no joker");
+        }
+        // In a three-card set the joker's suit is ambiguous: it is only taken from a full four.
+        if (meld.kind() == MeldKind.SET && cards.size() < 4) {
+            throw iae("a set's joker can only be taken from a four of a kind");
         }
         RamiCard joker = cards.set(jokerAt, real);
         if (MeldRules.kind(cards).orElse(null) != meld.kind()) {

@@ -2,6 +2,7 @@ package com.barbu.bot.rami;
 
 import com.barbu.rami.card.RamiCard;
 import com.barbu.rami.meld.Meld;
+import com.barbu.rami.meld.MeldKind;
 import com.barbu.rami.meld.MeldRules;
 import com.barbu.rami.round.Phase;
 import com.barbu.rami.round.RamiMove;
@@ -78,7 +79,7 @@ public final class RamiBot {
                     at = i;
                 }
             }
-            if (at < 0) {
+            if (at < 0 || (meld.kind() == MeldKind.SET && meld.cards().size() < 4)) {
                 continue;
             }
             RamiCard joker = meld.cards().get(at);
@@ -101,7 +102,7 @@ public final class RamiBot {
     }
 
     private static boolean discardFits(RamiRound round, List<RamiCard> hand) {
-        if (hand.size() <= 2 || round.discard().isEmpty()) {
+        if (hand.size() <= 1 || round.discard().isEmpty()) {
             return false;
         }
         RamiCard top = round.discard().get(round.discard().size() - 1);
@@ -109,7 +110,7 @@ public final class RamiBot {
     }
 
     private static boolean discardOpens(RamiRound round, List<RamiCard> hand) {
-        if (hand.size() <= 2 || round.discard().isEmpty()) {
+        if (hand.size() <= 1 || round.discard().isEmpty()) {
             return false;
         }
         RamiCard top = round.discard().get(round.discard().size() - 1);
@@ -147,7 +148,7 @@ public final class RamiBot {
         return Optional.empty();
     }
 
-    /** Highest-scoring set of disjoint melds worth 51+ that keeps a card, over both decompositions. */
+    /** Highest-scoring set of disjoint melds worth 51+ with a run that keeps a card, over both decompositions. */
     static List<List<RamiCard>> bestOpening(List<RamiCard> hand) {
         List<List<RamiCard>> best = List.of();
         int bestPoints = RamiRoundEngine.OPENING_MIN - 1;
@@ -158,14 +159,16 @@ public final class RamiBot {
                 List<List<RamiCard>> chosen = new ArrayList<>();
                 int used = 0;
                 int points = 0;
+                boolean hasRun = false;
                 for (int k = 0; k < melds.size(); k++) {
                     if ((mask & (1 << k)) != 0) {
                         chosen.add(melds.get(k));
                         used += melds.get(k).size();
                         points += MeldRules.points(melds.get(k));
+                        hasRun |= MeldRules.kind(melds.get(k)).orElseThrow() == MeldKind.RUN;
                     }
                 }
-                if (used < hand.size() && points > bestPoints) {
+                if (used < hand.size() && hasRun && points > bestPoints) {
                     best = chosen;
                     bestPoints = points;
                 }

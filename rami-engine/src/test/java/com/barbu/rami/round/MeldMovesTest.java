@@ -65,6 +65,16 @@ class MeldMovesTest {
     }
 
     @Test
+    void opening_without_a_run_is_rejected() {
+        List<RamiCard> kings = cs("KS", "KD", "KC");
+        List<RamiCard> queens = cs("QS", "QD", "QC");
+        RamiRound r = play(concat(concat(kings, queens), cs("2C")), false, List.of());
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> RamiRoundEngine.apply(r, 0, new Open(List.of(ids(kings), ids(queens)))));
+    }
+
+    @Test
     void opening_that_empties_the_hand_is_rejected() {
         List<RamiCard> run = cs("JH", "QH", "KH");
         List<RamiCard> set = cs("7S", "7D", "7C");
@@ -167,6 +177,21 @@ class MeldMovesTest {
         assertThrows(
                 IllegalArgumentException.class,
                 () -> RamiRoundEngine.apply(set, 0, new SwapJoker(4, otherSevenOfHearts.id())));
+    }
+
+    @Test
+    void a_sets_joker_is_taken_only_from_a_four_of_a_kind() {
+        RamiCard diamond = c("7D");
+        RamiCard club = c("7C");
+        RamiRound three = play(
+                List.of(diamond, club, c("2C")), true, List.of(new Meld(4, 1, MeldKind.SET, cs("7H", "7S", "JK"))));
+        assertThrows(
+                IllegalArgumentException.class, () -> RamiRoundEngine.apply(three, 0, new SwapJoker(4, diamond.id())));
+
+        RamiRound four = RamiRoundEngine.apply(three, 0, new LayOff(4, List.of(), List.of(diamond.id())));
+        RamiRound swapped = RamiRoundEngine.apply(four, 0, new SwapJoker(4, club.id()));
+        assertTrue(swapped.melds().get(0).cards().stream().noneMatch(RamiCard::isJoker));
+        assertEquals(1, swapped.mustPlay().size());
     }
 
     @Test

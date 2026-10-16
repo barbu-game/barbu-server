@@ -50,9 +50,16 @@ class DrawDiscardTest {
     }
 
     @Test
-    void discard_pile_is_closed_with_two_cards_or_fewer() {
-        RamiRound r = seat0(Phase.DRAW, cs("5S", "6S"), cs("9H"), cs("KD"));
+    void discard_pile_is_closed_with_a_single_card() {
+        RamiRound r = seat0(Phase.DRAW, cs("5S"), cs("9H"), cs("KD"));
         assertThrows(IllegalArgumentException.class, () -> RamiRoundEngine.apply(r, 0, new Draw(Source.DISCARD)));
+    }
+
+    @Test
+    void discard_pile_can_be_taken_with_two_cards() {
+        RamiRound r = seat0(Phase.DRAW, cs("5S", "6S"), cs("9H"), cs("KD"));
+        assertEquals(
+                3, RamiRoundEngine.apply(r, 0, new Draw(Source.DISCARD)).hand(0).size());
     }
 
     @Test

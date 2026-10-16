@@ -4,6 +4,7 @@ package com.barbu.bot.rami;
 
 import com.barbu.rami.card.RamiCard;
 import com.barbu.rami.meld.Meld;
+import com.barbu.rami.meld.MeldKind;
 import com.barbu.rami.meld.MeldRules;
 import com.barbu.rami.round.Phase;
 import com.barbu.rami.round.RamiMove;
@@ -110,6 +111,7 @@ final class BaselineRamiBot {
         List<List<RamiCard>> chosen = new ArrayList<>();
         int used = 0;
         int total = 0;
+        boolean hasRun = false;
         for (List<RamiCard> meld : byValue) {
             if (used + meld.size() >= handSize) {
                 continue;
@@ -117,7 +119,8 @@ final class BaselineRamiBot {
             chosen.add(meld);
             used += meld.size();
             total += MeldRules.points(meld);
-            if (total >= RamiRoundEngine.OPENING_MIN) {
+            hasRun |= MeldRules.kind(meld).orElseThrow() == MeldKind.RUN;
+            if (total >= RamiRoundEngine.OPENING_MIN && hasRun) {
                 return chosen;
             }
         }
