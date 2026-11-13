@@ -241,22 +241,27 @@ public final class RamiRoundEngine {
         if (real.isJoker()) {
             throw iae("a joker cannot replace a joker");
         }
-        List<RamiCard> cards = new ArrayList<>(meld.cards());
-        int jokerAt = -1;
-        for (int i = 0; i < cards.size(); i++) {
-            if (cards.get(i).isJoker()) {
-                jokerAt = i;
-            }
-        }
-        if (jokerAt < 0) {
+        if (meld.cards().stream().noneMatch(RamiCard::isJoker)) {
             throw iae("meld " + meld.id() + " has no joker");
         }
         // In a three-card set the joker's suit is ambiguous: it is only taken from a full four.
-        if (meld.kind() == MeldKind.SET && cards.size() < 4) {
+        if (meld.kind() == MeldKind.SET && meld.cards().size() < 4) {
             throw iae("a set's joker can only be taken from a four of a kind");
         }
-        RamiCard joker = cards.set(jokerAt, real);
-        if (MeldRules.kind(cards).orElse(null) != meld.kind()) {
+        List<RamiCard> cards = null;
+        RamiCard joker = null;
+        for (int i = 0; i < meld.cards().size() && joker == null; i++) {
+            if (!meld.cards().get(i).isJoker()) {
+                continue;
+            }
+            List<RamiCard> swapped = new ArrayList<>(meld.cards());
+            RamiCard taken = swapped.set(i, real);
+            if (MeldRules.kind(swapped).orElse(null) == meld.kind()) {
+                cards = swapped;
+                joker = taken;
+            }
+        }
+        if (joker == null) {
             throw iae("card does not stand for the joker");
         }
         t.hand().remove(real);

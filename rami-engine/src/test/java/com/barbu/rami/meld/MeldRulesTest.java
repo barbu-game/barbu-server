@@ -56,11 +56,23 @@ class MeldRulesTest {
     }
 
     @Test
-    void run_rejects_mixed_suits_wrong_order_and_two_jokers() {
+    void run_rejects_mixed_suits_wrong_order_and_three_jokers() {
         assertTrue(kind("5H", "6S", "7H").isEmpty());
         assertTrue(kind("7H", "5H", "6H").isEmpty());
-        assertTrue(kind("5H", "JK", "JK").isEmpty());
+        assertTrue(kind("5H", "JK", "JK", "JK").isEmpty());
         assertTrue(kind("5H", "6H").isEmpty());
+    }
+
+    @Test
+    void up_to_two_jokers_around_a_single_real_card() {
+        assertEquals(18, points("5H", "JK", "JK"));
+        assertEquals(18, points("JK", "JK", "7H"));
+        assertEquals(18, points("JK", "6H", "JK"));
+        assertEquals(35, points("5H", "JK", "7H", "JK", "9H"));
+        assertTrue(kind("JK", "JK", "AH").isPresent());
+        assertTrue(kind("JK", "AH", "JK").isEmpty());
+        assertEquals(Optional.of(MeldKind.RUN), kind("7H", "JK", "JK"));
+        assertEquals(28, points("7H", "7S", "JK", "JK"));
     }
 
     @Test
@@ -78,7 +90,7 @@ class MeldRulesTest {
         assertTrue(kind("7H", "7H", "7S").isEmpty());
         assertTrue(kind("7H", "7S", "7D", "7C", "JK").isEmpty());
         assertTrue(kind("7H", "8S", "7D").isEmpty());
-        assertTrue(kind("7H", "7S", "JK", "JK").isEmpty());
+        assertTrue(kind("7H", "JK", "JK", "JK").isEmpty());
     }
 
     @Test

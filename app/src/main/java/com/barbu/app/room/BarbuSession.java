@@ -294,7 +294,8 @@ final class BarbuSession implements GameSession {
                 lastRound,
                 yourLegalMoves,
                 "BARBU",
-                null);
+                null,
+                ctx.rematchVote());
     }
 
     /**

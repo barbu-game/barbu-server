@@ -136,13 +136,46 @@ class MeldMovesTest {
     }
 
     @Test
-    void second_joker_cannot_join_a_meld() {
+    void a_second_joker_joins_a_meld_but_not_a_third() {
         Meld meld = new Meld(4, 1, MeldKind.RUN, cs("5H", "6H", "JK"));
         RamiCard joker = c("JK");
-        RamiRound r = play(List.of(joker, c("2C")), true, List.of(meld));
+        RamiRound r = play(List.of(joker, c("JK"), c("2C")), true, List.of(meld));
+        RamiRound two = RamiRoundEngine.apply(r, 0, new LayOff(4, List.of(), List.of(joker.id())));
+        assertEquals(4, two.melds().get(0).cards().size());
+        RamiCard third =
+                two.hand(0).stream().filter(RamiCard::isJoker).findFirst().orElseThrow();
         assertThrows(
                 IllegalArgumentException.class,
-                () -> RamiRoundEngine.apply(r, 0, new LayOff(4, List.of(), List.of(joker.id()))));
+                () -> RamiRoundEngine.apply(two, 0, new LayOff(4, List.of(third.id()), List.of())));
+    }
+
+    @Test
+    void a_reclaimed_joker_can_be_laid_off_on_a_run_holding_one() {
+        RamiCard seven = c("7H");
+        List<RamiCard> other = cs("9S", "JK", "JS");
+        RamiRound r = play(
+                List.of(seven, c("2C"), c("3C")),
+                true,
+                List.of(new Meld(4, 1, MeldKind.RUN, cs("5H", "6H", "JK")), new Meld(5, 1, MeldKind.RUN, other)));
+        RamiRound swapped = RamiRoundEngine.apply(r, 0, new SwapJoker(4, seven.id()));
+        int joker = swapped.mustPlay().iterator().next();
+        RamiRound replayed = RamiRoundEngine.apply(swapped, 0, new LayOff(5, List.of(), List.of(joker)));
+        assertTrue(replayed.mustPlay().isEmpty());
+        assertEquals(
+                2,
+                replayed.melds().get(1).cards().stream()
+                        .filter(RamiCard::isJoker)
+                        .count());
+    }
+
+    @Test
+    void a_swap_replaces_the_joker_the_card_stands_for() {
+        RamiCard eight = c("8H");
+        RamiRound r =
+                play(List.of(eight, c("2C")), true, List.of(new Meld(4, 1, MeldKind.RUN, cs("5H", "JK", "7H", "JK"))));
+        RamiRound swapped = RamiRoundEngine.apply(r, 0, new SwapJoker(4, eight.id()));
+        assertEquals(eight, swapped.melds().get(0).cards().get(3));
+        assertTrue(swapped.melds().get(0).cards().get(1).isJoker());
     }
 
     @Test

@@ -12,6 +12,7 @@ public final class MeldRules {
     private static final int HIGH_ACE = 14;
     // An ace may open or close a run, never both: A..K or 2..A at most.
     private static final int MAX_RUN = 13;
+    private static final int MAX_JOKERS = 2;
 
     private MeldRules() {}
 
@@ -35,9 +36,9 @@ public final class MeldRules {
         return sum;
     }
 
-    // >= 3 cards with at most one joker also guarantees at least two real cards.
+    // >= 3 cards with at most two jokers also guarantees a real card to anchor the meld.
     private static boolean jokerBudgetOk(List<RamiCard> cards) {
-        return cards.size() >= 3 && cards.stream().filter(RamiCard::isJoker).count() <= 1;
+        return cards.size() >= 3 && cards.stream().filter(RamiCard::isJoker).count() <= MAX_JOKERS;
     }
 
     private static boolean isSet(List<RamiCard> cards) {
@@ -45,6 +46,10 @@ public final class MeldRules {
             return false;
         }
         List<RamiCard> reals = reals(cards);
+        // One real card and two jokers always read as a run, never as an ambiguous set.
+        if (reals.size() < 2) {
+            return false;
+        }
         Rank rank = reals.get(0).card().rank();
         return reals.stream().allMatch(c -> c.card().rank() == rank)
                 && reals.stream().map(c -> c.card().suit()).distinct().count() == reals.size();
@@ -59,7 +64,10 @@ public final class MeldRules {
         if (reals.stream().anyMatch(c -> c.card().suit() != suit)) {
             return OptionalInt.empty();
         }
-        int i = cards.get(0).isJoker() ? 1 : 0;
+        int i = 0;
+        while (cards.get(i).isJoker()) {
+            i++;
+        }
         Rank first = cards.get(i).card().rank();
         int[] candidates =
                 first == Rank.ACE ? new int[] {LOW_ACE - i, HIGH_ACE - i} : new int[] {first.trickStrength() - i};

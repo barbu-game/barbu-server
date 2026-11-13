@@ -39,6 +39,7 @@ class RamiSessionTest {
                 vote,
                 null,
                 null,
+                null,
                 null);
         assertEquals(vote, new RamiSession(4, between(1, 4)).view(ctx).stopVote());
     }
