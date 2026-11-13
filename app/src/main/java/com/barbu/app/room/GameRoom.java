@@ -8,6 +8,7 @@ import com.barbu.app.protocol.GameStateMessage;
 import com.barbu.app.protocol.GameStateMessage.PauseVoteState;
 import com.barbu.app.protocol.GameStateMessage.PausedState;
 import com.barbu.app.protocol.GameStateMessage.PlayerInfo;
+import com.barbu.app.protocol.GameStateMessage.RematchVoteState;
 import com.barbu.app.protocol.GameStateMessage.VoteState;
 import com.barbu.app.rating.RatingService;
 import com.barbu.engine.variant.Variant;
@@ -15,6 +16,7 @@ import com.barbu.engine.variant.Variants;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micronaut.websocket.WebSocketSession;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -22,6 +24,7 @@ import java.util.OptionalInt;
 import java.util.UUID;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -77,6 +80,9 @@ public final class GameRoom {
     private boolean paused;
     private long pauseEndsAtMs;
     private ScheduledFuture<?> pauseEnd;
+    private boolean rematchOpen;
+    private Boolean[] rematchVotes;
+    private ScheduledFuture<?> rematchTimeout;
 
     private ScheduledFuture<?> pendingTeardown;
 
@@ -378,6 +384,58 @@ public final class GameRoom {
         } else {
             broadcast();
         }
+    }
+
+    /** After game over, a human's yes opens a replay vote at the same seats; ranked games never replay. */
+    public synchronized void castRematchVote(int seat, boolean rematch) {
+        if (!rematchAllowed() || seat < 0 || seat >= playerCount || isBot[seat]) {
+            return;
+        }
+        if (!rematchOpen) {
+            if (!rematch) {
+                return;
+            }
+            rematchOpen = true;
+            rematchVotes = new Boolean[playerCount];
+            rematchTimeout = scheduler.schedule(this::onRematchTimeout, VOTE_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+        }
+        rematchVotes[seat] = rematch;
+        if (allHumansVoted(rematchVotes)) {
+            resolveRematchVote();
+        } else {
+            broadcast();
+        }
+    }
+
+    private boolean rematchAllowed() {
+        return game.rematchable() && game.isStarted() && (stopped || game.isComplete()) && !"ranked".equals(mode);
+    }
+
+    private synchronized void onRematchTimeout() {
+        if (rematchOpen) {
+            resolveRematchVote();
+        }
+    }
+
+    private void resolveRematchVote() {
+        rematchOpen = false;
+        if (rematchTimeout != null) {
+            rematchTimeout.cancel(false);
+            rematchTimeout = null;
+        }
+        if (!stopVotePasses(yesVotes(rematchVotes), humanSeatCount())) {
+            broadcast();
+            return;
+        }
+        stopped = false;
+        recorded = false;
+        Arrays.fill(strikes, 0);
+        game.start(ThreadLocalRandom.current().nextLong());
+        if (metrics != null) {
+            metrics.gameStarted();
+        }
+        broadcast();
+        resume();
     }
 
     /**
@@ -833,7 +891,7 @@ public final class GameRoom {
     private void scheduleActor() {
         cancelTurnTimer();
         if (currentActorIsBot()) {
-            scheduler.schedule(this::botStep, botDelayMs, TimeUnit.MILLISECONDS);
+            scheduler.schedule(this::botStep, game.botDelayMs(botDelayMs), TimeUnit.MILLISECONDS);
         } else {
             armTurnTimer();
         }
@@ -1055,6 +1113,12 @@ public final class GameRoom {
                         true, humanSeatCount(), yesVotes(pauseVotes), isBot[seat] ? null : pauseVotes[seat])
                 : null;
         PausedState pausedState = live && paused ? new PausedState(true, pauseEndsAtMs) : null;
+        RematchVoteState rematchVote = !rematchAllowed()
+                ? null
+                : rematchOpen
+                        ? new RematchVoteState(
+                                true, humanSeatCount(), yesVotes(rematchVotes), isBot[seat] ? null : rematchVotes[seat])
+                        : new RematchVoteState(false, humanSeatCount(), 0, null);
         OptionalInt actor = game.currentActor();
         Long turnDeadline = turnDeadlineEpochMs > 0 && actor.isPresent() && actor.getAsInt() == turnTimeoutSeat
                 ? turnDeadlineEpochMs
@@ -1071,7 +1135,8 @@ public final class GameRoom {
                 stopVote,
                 pauseVote,
                 pausedState,
-                turnDeadline));
+                turnDeadline,
+                rematchVote));
     }
 
     private String phase() {

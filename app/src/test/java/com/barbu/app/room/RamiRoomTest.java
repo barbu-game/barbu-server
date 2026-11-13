@@ -120,4 +120,80 @@ class RamiRoomTest {
         assertTrue(scheduler.step());
         assertNotEquals(0, room.viewFor(0).currentActor());
     }
+
+    /** Seat 0 human (drawing and shedding every turn) stops the game at the first round boundary. */
+    private static GameRoom stoppedTable(InlineScheduler scheduler, String mode) {
+        GameRoom room = new GameRoom(
+                "RAMI2",
+                4,
+                new RamiSession(4, null),
+                new ObjectMapper(),
+                scheduler,
+                0,
+                null,
+                null,
+                mode,
+                null,
+                null,
+                60_000,
+                2);
+        room.addHuman(new FakeSession(), "Alice", null);
+        for (int i = 0; i < 3; i++) {
+            room.addBot();
+        }
+        assertTrue(room.start(5L));
+        for (int i = 0; i < 1_000_000 && room.viewFor(0).stopVote() == null; i++) {
+            GameStateMessage v = room.viewFor(0);
+            if ("PLAYING".equals(v.phase()) && Integer.valueOf(0).equals(v.currentActor())) {
+                if ("DRAW".equals(v.rami().turnPhase())) {
+                    room.play(0, Map.of("kind", "draw", "source", "STOCK"));
+                } else {
+                    var hand = v.rami().yourHand();
+                    room.play(
+                            0,
+                            Map.of(
+                                    "kind",
+                                    "discard",
+                                    "cardId",
+                                    hand.get(hand.size() - 1).id()));
+                }
+            } else {
+                assertTrue(scheduler.step(), "table stalled");
+            }
+        }
+        room.castStopVote(0, true);
+        assertEquals("GAME_OVER", room.viewFor(0).phase());
+        return room;
+    }
+
+    @Test
+    void a_finished_table_replays_at_the_same_seats_on_a_majority_vote() {
+        InlineScheduler scheduler = new InlineScheduler();
+        GameRoom room = stoppedTable(scheduler, GameRoom.UNTIMED);
+        assertFalse(room.viewFor(0).rematchVote().open());
+
+        room.castRematchVote(0, true);
+
+        GameStateMessage v = room.viewFor(0);
+        assertNotEquals("GAME_OVER", v.phase());
+        assertNull(v.rematchVote());
+        assertEquals("Alice", v.players().get(0).name());
+        assertEquals(0, v.roundNumber());
+    }
+
+    @Test
+    void a_no_does_not_open_a_replay_vote() {
+        GameRoom room = stoppedTable(new InlineScheduler(), GameRoom.UNTIMED);
+        room.castRematchVote(0, false);
+        assertEquals("GAME_OVER", room.viewFor(0).phase());
+        assertFalse(room.viewFor(0).rematchVote().open());
+    }
+
+    @Test
+    void a_ranked_table_never_replays() {
+        GameRoom room = stoppedTable(new InlineScheduler(), "ranked");
+        assertNull(room.viewFor(0).rematchVote());
+        room.castRematchVote(0, true);
+        assertEquals("GAME_OVER", room.viewFor(0).phase());
+    }
 }

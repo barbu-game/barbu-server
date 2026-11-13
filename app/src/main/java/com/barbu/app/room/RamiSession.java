@@ -95,6 +95,17 @@ final class RamiSession implements GameSession {
         match = RamiMatchEngine.apply(match, seat, move);
     }
 
+    // Rami turns chain several moves; a slower pace lets each one be seen.
+    @Override
+    public long botDelayMs(long base) {
+        return base * 3 / 2;
+    }
+
+    @Override
+    public boolean rematchable() {
+        return true;
+    }
+
     @Override
     public OptionalLong holdStepMs() {
         return OptionalLong.empty();
@@ -220,7 +231,8 @@ final class RamiSession implements GameSession {
                 null,
                 null,
                 "RAMI",
-                rami);
+                rami,
+                ctx.rematchVote());
     }
 
     private List<Standing> standings(String[] names) {

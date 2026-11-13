@@ -26,6 +26,15 @@ interface GameSession {
 
     void playBot(int seat);
 
+    default long botDelayMs(long base) {
+        return base;
+    }
+
+    /** Whether a finished table may vote to replay at the same seats. */
+    default boolean rematchable() {
+        return false;
+    }
+
     /** Plays a whole turn on behalf of an idle human. */
     void playTimeout(int seat);
 

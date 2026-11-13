@@ -48,7 +48,8 @@ public record GameStateMessage(
         @Nullable LastRound lastRound,
         @Nullable List<MoveView> yourLegalMoves,
         String gameType,
-        @Nullable RamiView rami) {
+        @Nullable RamiView rami,
+        @Nullable RematchVoteState rematchVote) {
 
     public record PlayerInfo(int seat, String name, boolean bot, boolean connected) {}
 
@@ -73,6 +74,13 @@ public record GameStateMessage(
             @Nullable Boolean youVoted) {}
 
     public record PausedState(boolean active, long endsAtMs) {}
+
+    /** Present at game over when the table may replay; {@code open} while a vote runs. */
+    public record RematchVoteState(
+            boolean open,
+            int humans,
+            int rematchVotes,
+            @Nullable Boolean youVoted) {}
 
     public record CardView(String suit, String rank) {}
 

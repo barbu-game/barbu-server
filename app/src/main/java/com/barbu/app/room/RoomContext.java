@@ -3,6 +3,7 @@ package com.barbu.app.room;
 import com.barbu.app.protocol.GameStateMessage.PauseVoteState;
 import com.barbu.app.protocol.GameStateMessage.PausedState;
 import com.barbu.app.protocol.GameStateMessage.PlayerInfo;
+import com.barbu.app.protocol.GameStateMessage.RematchVoteState;
 import com.barbu.app.protocol.GameStateMessage.VoteState;
 import java.util.List;
 
@@ -19,4 +20,5 @@ record RoomContext(
         VoteState stopVote,
         PauseVoteState pauseVote,
         PausedState paused,
-        Long turnDeadline) {}
+        Long turnDeadline,
+        RematchVoteState rematchVote) {}
