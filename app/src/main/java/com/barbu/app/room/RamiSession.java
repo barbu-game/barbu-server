@@ -95,10 +95,10 @@ final class RamiSession implements GameSession {
         match = RamiMatchEngine.apply(match, seat, move);
     }
 
-    // Rami turns chain several moves; a slower pace lets each one be seen.
+    // Rami turns chain several moves; each waits for the previous card flight (up to 1s) to land.
     @Override
     public long botDelayMs(long base) {
-        return base * 3 / 2;
+        return base * 5 / 2;
     }
 
     @Override
